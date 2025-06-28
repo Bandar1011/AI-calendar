@@ -52,7 +52,7 @@ export default function Calendar() {
     const plan = {
       title,
       description,
-      date: selectedDate.toISOString().split('T')[0],
+      date: `${year}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
       color,
     };
     await fetch('/api/calendar', {
