@@ -1,6 +1,14 @@
 'use client'; // This is important for using state and event listeners in Next.js App Router
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+type Plan = {
+  id: string;
+  title: string;
+  description?: string;
+  date: string;
+  color?: string;
+};
 
 export default function Calendar() {
   const [year, setYear] = useState(new Date().getFullYear());// this side of the statments get the current date and year
@@ -9,6 +17,13 @@ export default function Calendar() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#3B82F6');
+  const [plans, setPlans] = useState<Plan[]>([]);
+
+  useEffect(() => {
+    fetch('/api/calendar')
+      .then(res => res.json())
+      .then(data => setPlans(data.plans));
+  }, []);
 
   const handlePrevYear = () => {
     setYear(prevYear => prevYear - 1); // Using functional update for prevYear
@@ -37,7 +52,7 @@ export default function Calendar() {
     const plan = {
       title,
       description,
-      date: selectedDate,
+      date: selectedDate.toISOString().split('T')[0],
       color,
     };
     await fetch('/api/calendar', {
@@ -45,11 +60,28 @@ export default function Calendar() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(plan),
     });
+    console.log(plan.date);
+    // 再取得
+    const res = await fetch('/api/calendar');
+    const data = await res.json();
+    setPlans(data.plans);
     setShowDialog(false);
     setTitle('');
     setDescription('');
     setColor('#3B82F6');
     setSelectedDate(null);
+  };
+
+  // 指定日付の予定を取得
+  const getPlansForDate = (date: Date) => {
+    return plans.filter(plan => {
+      const planDate = new Date(plan.date);
+      return (
+        planDate.getFullYear() === date.getFullYear() &&
+        planDate.getMonth() === date.getMonth() &&
+        planDate.getDate() === date.getDate()
+      );
+    });
   };
 
   return (
@@ -86,15 +118,28 @@ export default function Calendar() {
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1 text-center text-sm">
-                {monthDates.map((date, dateIndex) => (
-                  <div
-                    key={`${index}-${dateIndex}`}
-                    className={`p-1 ${date ? 'bg-gray-100 rounded-sm cursor-pointer hover:bg-blue-200' : 'text-transparent'}`}
-                    onClick={date ? () => handleDateClick(index, date) : undefined}
-                  >
-                    {date}
-                  </div>
-                ))}
+                {monthDates.map((date, dateIndex) => {
+                  if (!date) {
+                    return <div key={`${index}-${dateIndex}`} className="p-1 text-transparent">-</div>;
+                  }
+                  const cellDate = new Date(year, index, date);
+                  const cellPlans = getPlansForDate(cellDate);
+                  return (
+                    <div
+                      key={`${index}-${dateIndex}`}
+                      className={`p-1 bg-gray-100 rounded-sm cursor-pointer hover:bg-blue-200 relative`}
+                      onClick={() => handleDateClick(index, date)}
+                    >
+                      {date}
+                      {/* 予定があれば色付きドットを表示 */}
+                      <div className="flex gap-0.5 justify-center mt-0.5">
+                        {cellPlans.map((plan, i) => (
+                          <span key={plan.id || i} className="inline-block w-2 h-2 rounded-full" style={{ background: plan.color || '#3B82F6' }} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

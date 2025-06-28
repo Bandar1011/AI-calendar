@@ -14,7 +14,8 @@ model CalendarPlan {
   description String?
   date        DateTime
   color       String?  @default("#3B82F6")
-
+  userId      String
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
