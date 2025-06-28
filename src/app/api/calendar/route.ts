@@ -28,7 +28,14 @@ export async function POST(req: NextRequest) {
 
 // GET /api/calendar
 export async function GET() {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const plans = await prisma.calendarPlan.findMany({
+    where: {
+      userId: userId,
+    },
     orderBy: { date: 'asc' },
   });
   return NextResponse.json({ plans });
