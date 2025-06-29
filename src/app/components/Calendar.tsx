@@ -1,6 +1,17 @@
 'use client'; // This is important for using state and event listeners in Next.js App Router
 
 import React, { useState } from 'react';
+import TimelineModal from './TimelineModal'; // Import the new modal component
+
+/**
+ * Define the structure of a single Task object using TypeScript.
+ * This ensures that every task we create has a consistent shape.
+ */
+export interface Task {
+  id: number;
+  date: Date;
+  description: string;
+}
 
 /**
  * The main Calendar component.
@@ -31,8 +42,40 @@ export default function Calendar() {
    */
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  /**
+   * State to hold the master list of all tasks.
+   * Initialized as an empty array.
+   */
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  /**
+   * State to control whether the timeline modal is open or closed.
+   * Initialized to `false` so the modal is hidden by default.
+   */
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   // === EVENT HANDLERS ===
   // These are functions that run in response to user actions, like button clicks.
+
+  /**
+   * Adds a new task to the master `tasks` list.
+   * This function will be passed down to the modal.
+   */
+  const handleAddTask = (taskDescription: string, date: Date) => {
+    const newTask: Task = {
+      id: Date.now(), // Use timestamp for a simple unique ID
+      date: date,
+      description: taskDescription,
+    };
+    setTasks(prevTasks => [...prevTasks, newTask]);
+  };
+
+  /**
+   * Deletes a task from the master `tasks` list based on its ID.
+   */
+  const handleDeleteTask = (taskId: number) => {
+    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+  };
 
   /**
    * This function is called when the "Previous Year" button is clicked.
@@ -121,6 +164,7 @@ export default function Calendar() {
            */
           const handleDayClick = (day: number) => {
             setSelectedDate(new Date(year, index, day));
+            setIsModalOpen(true); // Open the modal when a day is clicked
           };
 
 
@@ -182,20 +226,18 @@ export default function Calendar() {
         })}
       </div>
 
-      {/* --- Timeline Section --- */}
-      {/* This section is conditionally rendered. It only appears if a date has been selected. */}
-      <div className="mt-8">
-        {selectedDate ? (
-          // If `selectedDate` is NOT null, show this:
-          <div>
-            <h2 className="text-xl font-bold">Timeline for {selectedDate.toDateString()}</h2>
-            <p className="mt-2 text-gray-600">Tasks for this day will appear here.</p>
-          </div>
-        ) : (
-          // If `selectedDate` IS null, show this:
-          <p className="text-center text-gray-500">Click a date to see its timeline.</p>
+      {/* --- Timeline Modal --- */}
+      {/* We render the modal component here. It will only be visible when `isModalOpen` is true. */}
+      <TimelineModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)} // Pass a function to close the modal
+        date={selectedDate}
+        tasks={tasks.filter(task => 
+          selectedDate && task.date.toDateString() === selectedDate.toDateString()
         )}
-      </div>
+        onAddTask={handleAddTask}
+        onDeleteTask={handleDeleteTask}
+      />
     </div>
   );
 }
