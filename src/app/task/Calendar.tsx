@@ -1,6 +1,6 @@
 'use client'; // This is important for using state and event listeners in Next.js App Router
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TimelineModal from './TimelineModal'; // Import the new modal component
 
 /**
@@ -54,6 +54,16 @@ export default function Calendar() {
    */
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const response = await fetch('/api/event');
+      const data = await response.json();
+      // Convert date strings from the API back into Date objects
+      // ... existing code ...
+    };
+    fetchTasks();
+  }, []);
+
   // === EVENT HANDLERS ===
   // These are functions that run in response to user actions, like button clicks.
 
@@ -61,7 +71,11 @@ export default function Calendar() {
    * Adds a new task to the master `tasks` list.
    * This function will be passed down to the modal.
    */
-  const handleAddTask = (taskDescription: string, date: Date) => {
+  const handleAddTask = async (taskDescription: string, date: Date) => {
+    const response = await fetch('/api/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
     const newTask: Task = {
       id: Date.now(), // Use timestamp for a simple unique ID
       date: date,
@@ -73,7 +87,11 @@ export default function Calendar() {
   /**
    * Deletes a task from the master `tasks` list based on its ID.
    */
-  const handleDeleteTask = (taskId: number) => {
+  const handleDeleteTask = async (taskId: number) => {
+    await fetch('/api/event', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
     setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
   };
 
