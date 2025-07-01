@@ -1,11 +1,9 @@
 import Link from 'next/link';
-import LoginButton from '@/components/LoginButton';
 
 export default function HomePage() {
   return (
     <main className="flex flex-col items-center justify-center min-h-screen">
       <div className="absolute top-4 right-4">
-        <LoginButton />
       </div>
       <h1 className="text-4xl font-bold mb-8">AI Calendar Project</h1>
       <Link href="/task" className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
