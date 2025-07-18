@@ -11,7 +11,7 @@ interface TimelineModalProps {
   date: Date | null;      // The selected date to display in the modal.
   tasks: Task[];          // Array of tasks for the selected day
   onAddTask: (description: string, date: Date) => void; // Function to add a new task
-  onDeleteTask: (taskId: number) => void; // Function to delete a task
+  onDeleteTask: (taskId: string) => void; // Function to delete a task
 }
 
 /**
@@ -33,6 +33,15 @@ export default function TimelineModal({ isOpen, onClose, date, tasks, onAddTask,
       onAddTask(editingInfo.description, taskDate);
       setEditingInfo(null); // Close the input form after saving
     }
+  };
+
+  const getTasksForHour = (hour: number) => {
+    return tasks.filter(task => {
+      const taskStartTime = new Date(task.start_time);
+      const taskEndTime = new Date(task.end_time);
+      const currentHour = taskStartTime.getHours();
+      return currentHour === hour;
+    });
   };
 
   // When the modal is open, render the following JSX.
@@ -67,8 +76,7 @@ export default function TimelineModal({ isOpen, onClose, date, tasks, onAddTask,
         <div className="mt-4 relative max-h-[60vh] overflow-y-auto">
           {/* Generate an array of hours from 0 to 23 */}
           {Array.from({ length: 24 }).map((_, hour) => {
-            // Find tasks that belong to the current hour
-            const tasksForHour = tasks.filter(task => task.date.getHours() === hour);
+            const tasksForHour = getTasksForHour(hour);
 
             return (
               <div key={hour} className="flex border-t border-gray-200">
@@ -84,7 +92,7 @@ export default function TimelineModal({ isOpen, onClose, date, tasks, onAddTask,
                   {/* Display existing tasks for the hour */}
                   {tasksForHour.map(task => (
                     <div key={task.id} className="bg-blue-100 text-blue-800 text-sm rounded-md px-2 py-1 mb-1 flex justify-between items-center">
-                      <span>{task.description}</span>
+                      <span>{task.title}</span>
                       <button 
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent the click from opening the edit form

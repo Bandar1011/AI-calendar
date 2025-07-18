@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { supabaseClient } from '@/lib/supabaseClient';
 
 /**
  * API route to fetch all tasks.
  * GET /api/tasks
  */
 export async function GET() {
-  const tasks = await prisma.task.findMany({
-    orderBy: { date: 'asc' },
-  });
-  return NextResponse.json(tasks);
+  const { data: events, error } = await supabaseClient
+    .from('events')
+    .select('*')
+    .order('start_time', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching events:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(events);
 }
 
 /**
@@ -17,14 +24,33 @@ export async function GET() {
  * POST /api/tasks
  */
 export async function POST(request: Request) {
-  const { description, date } = await request.json();
-  const newTask = await prisma.task.create({
-    data: {
-      description,
-      date: new Date(date),
-    },
-  });
-  return NextResponse.json(newTask, { status: 201 });
+  try {
+    const body = await request.json();
+    
+    const event = {
+      title: body.title,
+      description: body.description,
+      start_time: new Date(body.start_time).toISOString(),
+      end_time: new Date(body.end_time).toISOString(),
+      user_id: 'default-user'
+    };
+
+    const { data, error } = await supabaseClient
+      .from('events')
+      .insert([event])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating event:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data, { status: 201 });
+  } catch (error) {
+    console.error('Error in POST handler:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 /**
@@ -32,9 +58,22 @@ export async function POST(request: Request) {
  * DELETE /api/tasks
  */
 export async function DELETE(request: Request) {
-  const { id } = await request.json();
-  await prisma.task.delete({
-    where: { id },
-  });
-  return new NextResponse(null, { status: 204 }); // No Content
+  try {
+    const { id } = await request.json();
+
+    const { error } = await supabaseClient
+      .from('events')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error('Error in DELETE handler:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 } 

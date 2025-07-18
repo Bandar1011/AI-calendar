@@ -2,15 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import TimelineModal from './TimelineModal'; // Import the new modal component
+import { supabaseClient } from '@/lib/supabaseClient';
 
 /**
  * Define the structure of a single Task object using TypeScript.
  * This ensures that every task we create has a consistent shape.
  */
 export interface Task {
-  id: number;
-  date: Date;
+  id: string;
+  created_at?: string;
+  title: string;
+  start_time: string;
+  end_time: string;
   description: string;
+  user_id: string;
 }
 
 /**
@@ -54,15 +59,31 @@ export default function Calendar() {
    */
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Fetch tasks from Supabase when component mounts
   useEffect(() => {
-    const fetchTasks = async () => {
-      const response = await fetch('/api/event');
-      const data = await response.json();
-      // Convert date strings from the API back into Date objects
-      // ... existing code ...
-    };
     fetchTasks();
   }, []);
+
+  const fetchTasks = async () => {
+    try {
+      console.log('Fetching tasks from Supabase...');
+      const { data, error } = await supabaseClient
+        .from('events')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Fetched tasks:', data);
+        setTasks(data);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  };
 
   // === EVENT HANDLERS ===
   // These are functions that run in response to user actions, like button clicks.
@@ -72,27 +93,62 @@ export default function Calendar() {
    * This function will be passed down to the modal.
    */
   const handleAddTask = async (taskDescription: string, date: Date) => {
-    const response = await fetch('/api/event', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const newTask: Task = {
-      id: Date.now(), // Use timestamp for a simple unique ID
-      date: date,
-      description: taskDescription,
-    };
-    setTasks(prevTasks => [...prevTasks, newTask]);
+    try {
+      console.log('Adding new task:', taskDescription, 'for date:', date);
+      
+      // Create a task with a 1-hour duration by default
+      const endDate = new Date(date);
+      endDate.setHours(date.getHours() + 1);
+
+      const { data, error } = await supabaseClient
+        .from('events')
+        .insert({
+          title: taskDescription,
+          description: taskDescription,
+          start_time: date.toISOString(),
+          end_time: endDate.toISOString(),
+          user_id: 'default-user'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding task:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Task added successfully:', data);
+        setTasks(prevTasks => [...prevTasks, data]);
+        // Refresh tasks after adding
+        fetchTasks();
+      }
+    } catch (error) {
+      console.error('Error adding task:', error);
+    }
   };
 
   /**
    * Deletes a task from the master `tasks` list based on its ID.
    */
-  const handleDeleteTask = async (taskId: number) => {
-    await fetch('/api/event', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      console.log('Deleting task:', taskId);
+      const { error } = await supabaseClient
+        .from('events')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) {
+        console.error('Error deleting task:', error);
+        return;
+      }
+
+      console.log('Task deleted successfully');
+      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
   };
 
   /**
@@ -250,9 +306,19 @@ export default function Calendar() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)} // Pass a function to close the modal
         date={selectedDate}
-        tasks={tasks.filter(task => 
-          selectedDate && task.date.toDateString() === selectedDate.toDateString()
-        )}
+        tasks={tasks.filter(task => {
+          if (!selectedDate || !task.start_time) return false;
+          const taskDate = new Date(task.start_time);
+          const selectedDateStart = new Date(selectedDate.setHours(0, 0, 0, 0));
+          const selectedDateEnd = new Date(selectedDate.setHours(23, 59, 59, 999));
+          console.log('Filtering task:', {
+            taskDate,
+            selectedDateStart,
+            selectedDateEnd,
+            isInRange: taskDate >= selectedDateStart && taskDate <= selectedDateEnd
+          });
+          return taskDate >= selectedDateStart && taskDate <= selectedDateEnd;
+        })}
         onAddTask={handleAddTask}
         onDeleteTask={handleDeleteTask}
       />
