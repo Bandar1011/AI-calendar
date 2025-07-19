@@ -1,6 +1,6 @@
 'use client'; // This is important for using state and event listeners in Next.js App Router
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import TimelineModal from './TimelineModal'; // Import the new modal component
 import { supabaseClient } from '@/lib/supabaseClient';
 
@@ -18,12 +18,16 @@ export interface Task {
   user_id: string;
 }
 
+export interface CalendarRef {
+  handleAddTask: (description: string, date: Date) => Promise<void>;
+}
+
 /**
  * The main Calendar component.
  * This component is responsible for displaying the entire calendar,
  * including the year navigation, all 12 month views, and the timeline for a selected day.
  */
-export default function Calendar() {
+const Calendar = forwardRef<CalendarRef>((props, ref) => {
   // === STATE MANAGEMENT ===
   // State is like a component's memory. When state changes, React automatically
   // re-renders the component to show the latest updates. We use the `useState` hook for this.
@@ -64,6 +68,11 @@ export default function Calendar() {
     fetchTasks();
   }, []);
 
+  // Expose handleAddTask to parent components
+  useImperativeHandle(ref, () => ({
+    handleAddTask
+  }));
+
   const fetchTasks = async () => {
     try {
       console.log('Fetching tasks from Supabase...');
@@ -72,7 +81,7 @@ export default function Calendar() {
         .select('*');
 
       if (error) {
-        console.error('Error fetching tasks:', error);
+        console.error('Error fetching tasks:', error.message);
         return;
       }
 
@@ -94,37 +103,68 @@ export default function Calendar() {
    */
   const handleAddTask = async (taskDescription: string, date: Date) => {
     try {
-      console.log('Adding new task:', taskDescription, 'for date:', date);
+      if (!taskDescription) {
+        throw new Error('Task description is required');
+      }
+      if (!date || isNaN(date.getTime())) {
+        throw new Error('Invalid date provided');
+      }
+
+      console.log('Adding new task:', {
+        description: taskDescription,
+        date: date.toISOString(),
+        formattedDate: date.toLocaleString()
+      });
       
       // Create a task with a 1-hour duration by default
       const endDate = new Date(date);
       endDate.setHours(date.getHours() + 1);
 
+      const eventData = {
+        title: taskDescription,
+        description: taskDescription,
+        start_time: date.toISOString(),
+        end_time: endDate.toISOString(),
+        user_id: 'default-user'
+      };
+
+      console.log('Sending event data to Supabase:', eventData);
+
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        throw new Error('Supabase configuration is missing. Please check your environment variables.');
+      }
+
       const { data, error } = await supabaseClient
         .from('events')
-        .insert({
-          title: taskDescription,
-          description: taskDescription,
-          start_time: date.toISOString(),
-          end_time: endDate.toISOString(),
-          user_id: 'default-user'
-        })
+        .insert(eventData)
         .select()
         .single();
 
       if (error) {
-        console.error('Error adding task:', error);
-        return;
+        console.error('Supabase error adding task:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`Failed to add event: ${error.message}`);
       }
 
       if (data) {
         console.log('Task added successfully:', data);
         setTasks(prevTasks => [...prevTasks, data]);
         // Refresh tasks after adding
-        fetchTasks();
+        await fetchTasks();
+      } else {
+        throw new Error('No data returned from Supabase after insert');
       }
-    } catch (error) {
-      console.error('Error adding task:', error);
+    } catch (error: any) {
+      console.error('Error adding task:', {
+        error,
+        message: error?.message,
+        details: error?.details,
+        stack: error?.stack
+      });
+      throw error;
     }
   };
 
@@ -324,4 +364,6 @@ export default function Calendar() {
       />
     </div>
   );
-}
+});
+
+export default Calendar;

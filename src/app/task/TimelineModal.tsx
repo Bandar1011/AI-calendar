@@ -115,6 +115,8 @@ export default function TimelineModal({ isOpen, onClose, date, tasks, onAddTask,
                         onChange={(e) => setEditingInfo({ ...editingInfo, description: e.target.value })}
                         className="w-full border-gray-300 rounded-md shadow-sm text-sm p-1"
                         placeholder="Add a task..."
+                        id={`task-input-${editingInfo.hour}`}
+                        name={`task-input-${editingInfo.hour}`}
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveTask()}
                       />
                       <div className="flex justify-end mt-1">
