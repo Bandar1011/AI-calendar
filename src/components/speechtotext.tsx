@@ -147,7 +147,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
 
     try {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
       const prompt = `Extract event details from this text: "${text}". Return a JSON object with these fields:
         - title: the event title (required)
