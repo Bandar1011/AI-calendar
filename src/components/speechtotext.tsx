@@ -118,6 +118,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
+    setError(null); // Clear any previous errors when text changes
   };
 
   const clearText = () => {
@@ -126,35 +127,77 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
   };
 
   const processText = async () => {
-    if (!text.trim() || !calendarRef.current) return;
+    if (!text.trim()) {
+      setError('Please enter some text to process.');
+      return;
+    }
+
+    if (!calendarRef.current) {
+      setError('Calendar reference is not available. Please refresh the page.');
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+      setError('Gemini API key is not configured. Please check your environment variables.');
+      return;
+    }
 
     setIsProcessing(true);
+    setError(null);
+
     try {
-      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
       const prompt = `Extract event details from this text: "${text}". Return a JSON object with these fields:
-        - title: the event title
+        - title: the event title (required)
         - date: the date in YYYY-MM-DD format (use today's date if not specified)
         - time: the time in HH:mm format (use current time if not specified)
         Example: { "title": "Team Meeting", "date": "2024-03-21", "time": "14:30" }`;
 
+      console.log('Sending prompt to Gemini:', prompt);
       const result = await model.generateContent(prompt);
       const response = await result.response;
-      const jsonStr = response.text().match(/\{.*\}/)?.[0];
-      
-      if (!jsonStr) throw new Error('Failed to parse event details');
-      
+      const responseText = response.text();
+      console.log('Gemini response:', responseText);
+
+      const jsonStr = responseText.match(/\{.*\}/)?.[0];
+      if (!jsonStr) {
+        throw new Error('Failed to extract JSON from Gemini response');
+      }
+
+      console.log('Extracted JSON:', jsonStr);
       const eventDetails = JSON.parse(jsonStr);
-      const eventDate = new Date(eventDetails.date + 'T' + eventDetails.time);
-      
+
+      // Validate the required fields
+      if (!eventDetails.title) {
+        throw new Error('Event title is missing from the extracted details');
+      }
+
+      if (!eventDetails.date || !eventDetails.time) {
+        const now = new Date();
+        if (!eventDetails.date) {
+          eventDetails.date = now.toISOString().split('T')[0];
+        }
+        if (!eventDetails.time) {
+          eventDetails.time = now.toTimeString().split(' ')[0].slice(0, 5);
+        }
+      }
+
+      const eventDate = new Date(`${eventDetails.date}T${eventDetails.time}`);
+      if (isNaN(eventDate.getTime())) {
+        throw new Error('Invalid date or time format in the extracted details');
+      }
+
+      console.log('Adding task:', { title: eventDetails.title, date: eventDate });
       await calendarRef.current.handleAddTask(eventDetails.title, eventDate);
+      
       setShowSuccess(true);
       setText('');
       setTimeout(() => setShowSuccess(false), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing text:', error);
-      setError('Failed to process text. Please try again.');
+      setError(error.message || 'Failed to process text. Please try again with clearer event details.');
     } finally {
       setIsProcessing(false);
     }
@@ -198,7 +241,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
             value={text}
             onChange={handleTextChange}
             className="w-full p-4 border border-gray-300 rounded-lg min-h-[100px] resize-y text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Speak or type your event details here..."
+            placeholder="Speak or type your event details here... (e.g., 'Team meeting tomorrow at 2:30 PM')"
           />
         </div>
 
