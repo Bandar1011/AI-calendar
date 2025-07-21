@@ -127,6 +127,23 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
     setError(null);
   };
 
+  const extractJsonFromResponse = (text: string): string => {
+    // Remove markdown code block formatting
+    const cleanText = text
+      .replace(/```json\n/g, '') // Remove ```json
+      .replace(/```\n/g, '')     // Remove ```
+      .replace(/```/g, '')       // Remove any remaining ```
+      .trim();                   // Remove extra whitespace
+
+    // Try to find JSON object in the cleaned text
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON object found in response');
+    }
+
+    return jsonMatch[0];
+  };
+
   const processText = async () => {
     if (!text.trim()) {
       setError('Please enter some text to process.');
@@ -165,10 +182,10 @@ Current time: ${currentTime}
 Context:
 - You must extract: event title (what), date (when), time (what time), and optionally people/location
 - Always return a valid JSON object
-- Never include any explanatory text
+- Never include any explanatory text or markdown formatting
 - If date/time is missing, use current date/time
 
-Example inputs and expected outputs:
+Example inputs and outputs:
 
 Input: "Meeting with John tomorrow at 3pm"
 {
@@ -213,7 +230,7 @@ Rules for processing:
 8. Include location in title if mentioned
 9. Keep all relevant context in title
 
-Now process this input and return ONLY a JSON object with exactly these fields:
+IMPORTANT: Return ONLY the JSON object without any markdown formatting or code blocks. Just the raw JSON object like this:
 {
   "title": "descriptive title with all context",
   "date": "YYYY-MM-DD",
@@ -230,9 +247,13 @@ Now process this input and return ONLY a JSON object with exactly these fields:
 
       setDebugInfo(`Processing response:\n${responseText}`);
 
-      // Try to parse the entire response as JSON first
+      // Try to parse the response
       try {
-        const eventDetails = JSON.parse(responseText);
+        const jsonText = extractJsonFromResponse(responseText);
+        console.log('Extracted JSON:', jsonText);
+        setDebugInfo(`Extracted JSON:\n${jsonText}`);
+        
+        const eventDetails = JSON.parse(jsonText);
         
         // Validate the required fields
         if (!eventDetails.title || !eventDetails.title.trim()) {
@@ -279,22 +300,7 @@ Now process this input and return ONLY a JSON object with exactly these fields:
       } catch (jsonError: any) {
         console.error('JSON parsing error:', jsonError);
         setDebugInfo(`Error processing response:\n${jsonError.message}\n\nResponse:\n${responseText}`);
-        
-        // Try to extract any JSON-like structure from the response
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error(`Could not understand: "${text}"\n\nPlease include:\n1. What: the event description\n2. When: the date (e.g., tomorrow, next Friday)\n3. Time: when it occurs (e.g., 3pm, morning)`);
-        }
-        
-        try {
-          // Try to parse the extracted JSON
-          const extractedJson = JSON.parse(jsonMatch[0]);
-          if (!extractedJson.title || !extractedJson.date || !extractedJson.time) {
-            throw new Error('Missing required fields');
-          }
-        } catch (e) {
-          throw new Error(`Could not understand the event details. Try something like:\n- "Meeting with John tomorrow at 3pm"\n- "Lunch next Friday at 12:30"\n- "Doctor appointment on March 25th at 10am"`);
-        }
+        throw new Error(`Could not understand: "${text}"\n\nPlease include:\n1. What: the event description\n2. When: the date (e.g., tomorrow, next Friday)\n3. Time: when it occurs (e.g., 3pm, morning)`);
       }
     } catch (error: any) {
       console.error('Error processing text:', error);
