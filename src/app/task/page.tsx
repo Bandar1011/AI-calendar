@@ -14,15 +14,13 @@ export default function TaskPage() {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Task Calendar</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <SpeechToText calendarRef={calendarRef} />
-        </div>
-        <div>
-          <Calendar ref={calendarRef} />
-        </div>
+    <div className="container mx-auto px-4 py-6">
+      <h1 className="text-3xl font-bold text-center mb-8">Task Calendar</h1>
+      <div className="max-w-2xl mx-auto mb-8">
+        <SpeechToText calendarRef={calendarRef} />
+      </div>
+      <div className="w-full">
+        <Calendar ref={calendarRef} />
       </div>
     </div>
   );

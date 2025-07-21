@@ -2,17 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { CalendarRef } from '@/app/task/Calendar';
-
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
 
 interface SpeechToTextProps {
-  calendarRef: React.RefObject<CalendarRef | null>;
+  calendarRef: React.RefObject<{
+    handleAddTask: (description: string, date: Date) => Promise<void>;
+  }>;
 }
 
 const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
@@ -110,60 +104,59 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
   };
 
   return (
-    <div className="bg-navy-800 p-6 rounded-lg shadow-lg">
-      <div className="flex justify-between items-center mb-4">
-        <button
-          onClick={isListening ? stopListening : startListening}
-          className={`px-4 py-2 rounded-full ${
-            isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
-          } text-white font-semibold flex items-center`}
-        >
-          {isListening ? (
-            <>
-              <span className="mr-2">⚫</span>
-              Stop Recording
-            </>
-          ) : (
-            'Start Recording'
-          )}
-        </button>
-        <button
-          onClick={clearText}
-          className="px-4 py-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white font-semibold"
-        >
-          Clear
-        </button>
-      </div>
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="flex flex-col items-center space-y-4">
+        <div className="flex space-x-4">
+          <button
+            onClick={isListening ? stopListening : startListening}
+            className={`px-6 py-3 rounded-full font-semibold flex items-center ${
+              isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
+            } text-white transition-colors`}
+          >
+            {isListening ? (
+              <>
+                <span className="mr-2 animate-pulse">⚫</span>
+                Stop Recording
+              </>
+            ) : (
+              'Start Recording'
+            )}
+          </button>
+          <button
+            onClick={clearText}
+            className="px-6 py-3 rounded-full bg-gray-500 hover:bg-gray-600 text-white font-semibold transition-colors"
+          >
+            Clear
+          </button>
+        </div>
 
-      <div className="mb-4">
-        <p className="font-semibold mb-2 text-white">Text:</p>
-        <textarea
-          value={text}
-          onChange={handleTextChange}
-          className="w-full p-3 bg-white rounded-lg min-h-[100px] resize-y text-black"
-          placeholder="Speak or type your event details here..."
-        />
-      </div>
+        <div className="w-full">
+          <textarea
+            value={text}
+            onChange={handleTextChange}
+            className="w-full p-4 border border-gray-300 rounded-lg min-h-[100px] resize-y text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Speak or type your event details here..."
+          />
+        </div>
 
-      <div className="flex justify-end">
         <button
           onClick={processText}
           disabled={!text.trim() || isProcessing}
-          className={`px-4 py-2 rounded-full ${
+          className={`px-6 py-3 rounded-full font-semibold transition-colors ${
             !text.trim() || isProcessing
-              ? 'bg-gray-400'
+              ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-green-500 hover:bg-green-600'
-          } text-white font-semibold`}
+          } text-white`}
         >
           {isProcessing ? 'Processing...' : 'Process Text'}
         </button>
-      </div>
 
-      {showSuccess && (
-        <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg">
-          Event added successfully!
-        </div>
-      )}
+        {showSuccess && (
+          <div className="w-full p-4 bg-green-100 text-green-700 rounded-lg text-center">
+            Event added successfully!
+          </div>
+        )}
+      </div>
     </div>
   );
 };
