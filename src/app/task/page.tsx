@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef } from 'react';
-import Calendar, { CalendarRef } from './Calendar';
+import Calendar from './Calendar';
 import SpeechToText from '@/components/speechtotext';
 import { useUser } from '@clerk/nextjs';
 
