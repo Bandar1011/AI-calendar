@@ -20,15 +20,45 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
   const [text, setText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
+      try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          setError('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
+          return;
+        }
+
         recognitionRef.current = new SpeechRecognition();
         recognitionRef.current.continuous = true;
         recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = 'en-US';
+
+        recognitionRef.current.onstart = () => {
+          console.log('Speech recognition started');
+          setError(null);
+        };
+
+        recognitionRef.current.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setError(`Error: ${event.error}. Please check your microphone permissions.`);
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onend = () => {
+          console.log('Speech recognition ended');
+          if (isListening) {
+            try {
+              recognitionRef.current.start();
+            } catch (error) {
+              console.error('Error restarting recognition:', error);
+              setIsListening(false);
+            }
+          }
+        };
 
         recognitionRef.current.onresult = (event: any) => {
           const transcript = Array.from(event.results)
@@ -37,33 +67,52 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
             .join('');
           setText(transcript);
         };
-
-        recognitionRef.current.onend = () => {
-          if (isListening) {
-            recognitionRef.current.start();
-          }
-        };
+      } catch (error) {
+        console.error('Error initializing speech recognition:', error);
+        setError('Failed to initialize speech recognition. Please check your browser permissions.');
       }
     }
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch (error) {
+          console.error('Error stopping recognition:', error);
+        }
       }
     };
   }, [isListening]);
 
-  const startListening = () => {
-    if (recognitionRef.current) {
+  const startListening = async () => {
+    setError(null);
+    try {
+      if (!recognitionRef.current) {
+        setError('Speech recognition is not initialized. Please refresh the page.');
+        return;
+      }
+
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop()); // Stop the stream after permission check
+
       recognitionRef.current.start();
       setIsListening(true);
+    } catch (error) {
+      console.error('Error starting recognition:', error);
+      setError('Failed to access microphone. Please check your browser permissions.');
+      setIsListening(false);
     }
   };
 
   const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
+    try {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
       setIsListening(false);
+    } catch (error) {
+      console.error('Error stopping recognition:', error);
     }
   };
 
@@ -73,6 +122,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
 
   const clearText = () => {
     setText('');
+    setError(null);
   };
 
   const processText = async () => {
@@ -104,6 +154,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (error) {
       console.error('Error processing text:', error);
+      setError('Failed to process text. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -135,6 +186,12 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
             Clear
           </button>
         </div>
+
+        {error && (
+          <div className="w-full p-4 bg-red-100 text-red-700 rounded-lg text-center">
+            {error}
+          </div>
+        )}
 
         <div className="w-full">
           <textarea
