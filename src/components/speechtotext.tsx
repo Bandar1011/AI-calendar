@@ -147,54 +147,73 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
 
     try {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-      const prompt = `Extract event details from this text: "${text}". Return a JSON object with these fields:
-        - title: the event title (required)
-        - date: the date in YYYY-MM-DD format (use today's date if not specified)
-        - time: the time in HH:mm format (use current time if not specified)
-        Example: { "title": "Team Meeting", "date": "2024-03-21", "time": "14:30" }`;
+      const prompt = `You are a calendar event parser. Extract event details from this text and return ONLY a JSON object with no additional text or explanation.
+
+Input text: "${text}"
+
+Required JSON format:
+{
+  "title": "extracted event title (required)",
+  "date": "YYYY-MM-DD (use today's date if not specified)",
+  "time": "HH:mm (use current time if not specified)"
+}
+
+Rules:
+1. Return ONLY the JSON object, no other text
+2. Title is required
+3. Use today's date if no date is specified
+4. Use current time if no time is specified
+5. Dates should be in YYYY-MM-DD format
+6. Times should be in 24-hour HH:mm format
+7. Handle relative dates like "tomorrow", "next Friday", etc.
+8. Extract as much context as possible for the title`;
 
       console.log('Sending prompt to Gemini:', prompt);
       const result = await model.generateContent(prompt);
       const response = await result.response;
-      const responseText = response.text();
+      const responseText = response.text().trim();
       console.log('Gemini response:', responseText);
 
-      const jsonStr = responseText.match(/\{.*\}/)?.[0];
-      if (!jsonStr) {
-        throw new Error('Failed to extract JSON from Gemini response');
-      }
-
-      console.log('Extracted JSON:', jsonStr);
-      const eventDetails = JSON.parse(jsonStr);
-
-      // Validate the required fields
-      if (!eventDetails.title) {
-        throw new Error('Event title is missing from the extracted details');
-      }
-
-      if (!eventDetails.date || !eventDetails.time) {
-        const now = new Date();
-        if (!eventDetails.date) {
-          eventDetails.date = now.toISOString().split('T')[0];
+      // Try to parse the entire response as JSON first
+      try {
+        const eventDetails = JSON.parse(responseText);
+        
+        // Validate the required fields
+        if (!eventDetails.title) {
+          throw new Error('Event title is missing from the extracted details');
         }
-        if (!eventDetails.time) {
-          eventDetails.time = now.toTimeString().split(' ')[0].slice(0, 5);
+
+        if (!eventDetails.date || !eventDetails.time) {
+          const now = new Date();
+          if (!eventDetails.date) {
+            eventDetails.date = now.toISOString().split('T')[0];
+          }
+          if (!eventDetails.time) {
+            eventDetails.time = now.toTimeString().split(' ')[0].slice(0, 5);
+          }
         }
-      }
 
-      const eventDate = new Date(`${eventDetails.date}T${eventDetails.time}`);
-      if (isNaN(eventDate.getTime())) {
-        throw new Error('Invalid date or time format in the extracted details');
-      }
+        const eventDate = new Date(`${eventDetails.date}T${eventDetails.time}`);
+        if (isNaN(eventDate.getTime())) {
+          throw new Error('Invalid date or time format in the extracted details');
+        }
 
-      console.log('Adding task:', { title: eventDetails.title, date: eventDate });
-      await calendarRef.current.handleAddTask(eventDetails.title, eventDate);
-      
-      setShowSuccess(true);
-      setText('');
-      setTimeout(() => setShowSuccess(false), 3000);
+        console.log('Adding task:', { title: eventDetails.title, date: eventDate });
+        await calendarRef.current.handleAddTask(eventDetails.title, eventDate);
+        
+        setShowSuccess(true);
+        setText('');
+        setTimeout(() => setShowSuccess(false), 3000);
+      } catch (parseError) {
+        // If direct parsing fails, try to find JSON in the response
+        const jsonStr = responseText.match(/\{[\s\S]*\}/)?.[0];
+        if (!jsonStr) {
+          throw new Error('Could not extract valid JSON from the response. Please try rephrasing your event details.');
+        }
+        throw new Error('Failed to parse the response. Please try again with clearer event details.');
+      }
     } catch (error: any) {
       console.error('Error processing text:', error);
       setError(error.message || 'Failed to process text. Please try again with clearer event details.');
