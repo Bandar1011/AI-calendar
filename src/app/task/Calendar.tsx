@@ -13,6 +13,7 @@ interface Task {
   id: string;
   title: string;
   start_time: string;
+  end_time: string;
   user_id: string;
 }
 
@@ -63,11 +64,19 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
 
     try {
       console.log('Adding task:', { description, date });
+      
+      // Create end time 1 hour after start time
+      const endDate = new Date(date);
+      endDate.setHours(endDate.getHours() + 1);
+
       const event = {
         title: description,
         start_time: date.toISOString(),
+        end_time: endDate.toISOString(), // Add end_time 1 hour after start_time
         user_id: user.id
       };
+
+      console.log('Inserting event:', event);
 
       const { data, error } = await supabaseClient
         .from('events')

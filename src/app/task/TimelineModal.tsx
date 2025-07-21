@@ -6,6 +6,7 @@ interface Task {
   id: string;
   title: string;
   start_time: string;
+  end_time: string;
   user_id: string;
 }
 
@@ -14,7 +15,7 @@ interface TimelineModalProps {
   onClose: () => void;
   date: Date | null;
   tasks: Task[];
-  onAddTask: (description: string, date: Date) => void;
+  onAddTask: (description: string, date: Date) => Promise<void>;
   onDeleteTask: (taskId: string) => void;
 }
 
@@ -29,6 +30,7 @@ export default function TimelineModal({ isOpen, onClose, date, tasks, onAddTask,
     if (editingInfo && editingInfo.description.trim() !== '') {
       const taskDate = new Date(date);
       taskDate.setHours(editingInfo.hour);
+      taskDate.setMinutes(0);
       onAddTask(editingInfo.description, taskDate);
       setEditingInfo(null); // Close the input form after saving
     }
@@ -70,20 +72,36 @@ export default function TimelineModal({ isOpen, onClose, date, tasks, onAddTask,
                   </span>
                 </div>
                 <div className="flex-1 min-h-[50px] p-1" onClick={() => !editingInfo && setEditingInfo({ hour, description: '' })}>
-                  {tasksForHour.map(task => (
-                    <div key={task.id} className="bg-blue-100 text-blue-800 text-sm rounded-md px-2 py-1 mb-1 flex justify-between items-center">
-                      <span>{task.title}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteTask(task.id);
-                        }}
-                        className="text-blue-600 hover:text-blue-900 font-bold text-lg ml-2"
+                  {tasksForHour.map(task => {
+                    const startTime = new Date(task.start_time);
+                    const endTime = new Date(task.end_time);
+                    const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60); // Duration in minutes
+                    const height = Math.max(50, (duration / 60) * 50); // 50px per hour
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="bg-blue-100 text-blue-800 text-sm rounded-md px-2 py-1 mb-1 flex justify-between items-start"
+                        style={{ minHeight: `${height}px` }}
                       >
-                        &times;
-                      </button>
-                    </div>
-                  ))}
+                        <div>
+                          <div>{task.title}</div>
+                          <div className="text-xs text-blue-600">
+                            {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteTask(task.id);
+                          }}
+                          className="text-blue-600 hover:text-blue-900 font-bold text-lg ml-2"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    );
+                  })}
 
                   {editingInfo && editingInfo.hour === hour && (
                     <div className="mt-1">
