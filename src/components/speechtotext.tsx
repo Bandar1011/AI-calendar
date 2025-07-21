@@ -4,6 +4,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CalendarRef } from '@/app/task/Calendar';
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
 interface SpeechToTextProps {
   calendarRef: React.RefObject<CalendarRef | null>;
 }
