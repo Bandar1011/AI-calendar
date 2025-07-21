@@ -20,17 +20,15 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
   const [transcript, setTranscript] = useState("");
   const [recognition, setRecognition] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [eventDetails, setEventDetails] = useState<any>(null);
   const [geminiStatus, setGeminiStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     // Test Gemini connection
     const testConnection = async () => {
       try {
-        console.log('Starting Gemini connection test...');
         const isConnected = await testGeminiConnection();
-        console.log('Gemini connection test result:', isConnected);
         if (isConnected) {
           setGeminiStatus('ready');
           setErrorMessage("");
@@ -39,7 +37,6 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
           setErrorMessage("Failed to connect to Gemini AI. Please try again.");
         }
       } catch (error) {
-        console.error('Error testing Gemini connection:', error);
         setGeminiStatus('error');
         setErrorMessage(error instanceof Error ? error.message : "Unknown error occurred");
       }
@@ -58,15 +55,27 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
         recognition.onresult = (event: any) => {
           const current = event.resultIndex;
           const transcript = event.results[current][0].transcript;
-          setTranscript(transcript);
-          if (onResult) {
-            onResult(transcript);
-          }
+          // Only update the transcript, don't call onResult
+          setTranscript(prev => {
+            // If this is a new result (not interim), append it
+            if (event.results[current].isFinal) {
+              return prev + ' ' + transcript;
+            }
+            return prev;
+          });
         };
 
         recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          setIsListening(false);
+          if (event.error !== 'no-speech') {
+            console.error('Speech recognition error:', event.error);
+            setIsListening(false);
+          }
+        };
+
+        recognition.onend = () => {
+          if (isListening) {
+            recognition.start();
+          }
         };
 
         setRecognition(recognition);
@@ -78,7 +87,6 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
     if (recognition) {
       recognition.start();
       setIsListening(true);
-      setEventDetails(null);
     }
   };
 
@@ -94,12 +102,10 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
     if (onResult) {
       onResult(e.target.value);
     }
-    setEventDetails(null);
   };
 
   const clearTranscript = () => {
     setTranscript("");
-    setEventDetails(null);
     if (onResult) {
       onResult("");
     }
@@ -111,22 +117,27 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
     setIsProcessing(true);
     try {
       const details = await processEventText(transcript);
-      setEventDetails(details);
+      if (details && onAddEvent) {
+        await onAddEvent(details);
+        setShowSuccess(true);
+        setTranscript(""); // Clear the input after successful processing
+        setTimeout(() => {
+          setShowSuccess(false);
+        }, 3000);
+      }
     } catch (error) {
       console.error('Error processing text:', error);
+      setErrorMessage("Failed to process the text. Please try again.");
+      setTimeout(() => {
+        setErrorMessage("");
+      }, 3000);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleAddToCalendar = () => {
-    if (eventDetails && onAddEvent) {
-      onAddEvent(eventDetails);
-    }
-  };
-
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md">
+    <div className="p-4 bg-navy-800 rounded-lg shadow-md">
       {geminiStatus === 'error' && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
           <p className="font-semibold">Error connecting to Gemini AI</p>
@@ -150,7 +161,7 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
         <button
           onClick={isListening ? stopListening : startListening}
           disabled={!recognition}
-          className={`px-4 py-2 rounded-full ${
+          className={`relative px-4 py-2 rounded-full ${
             !recognition 
               ? 'bg-gray-400'
               : isListening 
@@ -164,6 +175,9 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
               ? "Stop Listening" 
               : "Start Listening"
           }
+          {isListening && (
+            <div className="absolute top-1/2 -translate-y-1/2 right-2 w-3 h-3 bg-white rounded-sm animate-pulse"/>
+          )}
         </button>
         <button
           onClick={clearTranscript}
@@ -184,28 +198,26 @@ export default function SpeechToText({ onResult, onAddEvent }: SpeechToTextProps
         </button>
       </div>
       <div className="mt-4">
-        <p className="font-semibold mb-2">Text:</p>
+        <p className="font-semibold mb-2 text-white">Text:</p>
         <textarea
           value={transcript}
           onChange={handleTextChange}
-          className="w-full p-3 bg-gray-50 rounded-lg min-h-[100px] resize-y"
-          placeholder="Start speaking or type here..."
+          className="w-full p-3 bg-white rounded-lg min-h-[100px] resize-y text-black"
+          placeholder="Type or speak to add events to your calendar (e.g., 'Meeting with John tomorrow at 3 PM')"
           id="speech-input"
           name="speech-input"
         />
       </div>
-      {eventDetails && (
-        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-          <h3 className="font-semibold text-lg mb-2">Extracted Event Details:</h3>
-          <pre className="whitespace-pre-wrap overflow-x-auto">
-            {JSON.stringify(eventDetails, null, 2)}
-          </pre>
-          <button
-            onClick={handleAddToCalendar}
-            className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full font-semibold transition-colors"
-          >
-            Add to Calendar
-          </button>
+      {showSuccess && (
+        <div className="mt-4 p-4 bg-green-100 text-green-700 rounded-lg transition-opacity duration-300">
+          <p className="font-semibold">Success!</p>
+          <p>Event has been added to your calendar.</p>
+        </div>
+      )}
+      {errorMessage && (
+        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg transition-opacity duration-300">
+          <p className="font-semibold">Error</p>
+          <p>{errorMessage}</p>
         </div>
       )}
     </div>

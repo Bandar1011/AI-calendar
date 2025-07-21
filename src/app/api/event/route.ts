@@ -1,30 +1,41 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
+import { currentUser } from "@clerk/nextjs";
 import { supabaseClient } from '@/lib/supabaseClient';
 
-/**
- * API route to fetch all tasks.
- * GET /api/tasks
- */
 export async function GET() {
-  const { data: events, error } = await supabaseClient
-    .from('events')
-    .select('*')
-    .order('start_time', { ascending: true });
+  try {
+    const user = await currentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (error) {
-    console.error('Error fetching events:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const { data: events, error } = await supabaseClient
+      .from('events')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching events:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(events);
+  } catch (error) {
+    console.error('Error in GET handler:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-
-  return NextResponse.json(events);
 }
 
-/**
- * API route to create a new task.
- * POST /api/tasks
- */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const user = await currentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     
     const event = {
@@ -32,7 +43,7 @@ export async function POST(request: Request) {
       description: body.description,
       start_time: new Date(body.start_time).toISOString(),
       end_time: new Date(body.end_time).toISOString(),
-      user_id: 'default-user'
+      user_id: user.id
     };
 
     const { data, error } = await supabaseClient
@@ -53,18 +64,21 @@ export async function POST(request: Request) {
   }
 }
 
-/**
- * API route to delete a task.
- * DELETE /api/tasks
- */
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
+    const user = await currentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await request.json();
 
     const { error } = await supabaseClient
       .from('events')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id); // Ensure users can only delete their own events
 
     if (error) {
       console.error('Error deleting event:', error);

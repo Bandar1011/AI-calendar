@@ -30,7 +30,6 @@ export type Database = {
           user_id?: string
         }
       }
-      // Add other tables here as needed
     }
     Views: {
       [_ in never]: never
