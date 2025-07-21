@@ -21,6 +21,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -144,6 +145,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
 
     setIsProcessing(true);
     setError(null);
+    setDebugInfo(null);
 
     try {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
@@ -218,11 +220,15 @@ Now process this input and return ONLY a JSON object with exactly these fields:
   "time": "HH:mm"
 }`;
 
+      console.log('Processing text:', text);
       console.log('Sending prompt to Gemini:', prompt);
+      
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const responseText = response.text().trim();
       console.log('Gemini response:', responseText);
+
+      setDebugInfo(`Gemini response: ${responseText}`);
 
       // Try to parse the entire response as JSON first
       try {
@@ -262,9 +268,12 @@ Now process this input and return ONLY a JSON object with exactly these fields:
         
         setShowSuccess(true);
         setText('');
+        setDebugInfo(null);
         setTimeout(() => setShowSuccess(false), 3000);
-      } catch (jsonError) {
+      } catch (jsonError: any) {
         console.error('JSON parsing error:', jsonError);
+        setDebugInfo(`JSON parsing error: ${jsonError.message}\nResponse: ${responseText}`);
+        
         // Try to extract any JSON-like structure from the response
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
@@ -317,7 +326,7 @@ Now process this input and return ONLY a JSON object with exactly these fields:
         </div>
 
         {error && (
-          <div className="w-full p-4 bg-red-100 text-red-700 rounded-lg text-center">
+          <div className="w-full p-4 bg-red-100 text-red-700 rounded-lg text-center whitespace-pre-line">
             {error}
           </div>
         )}
@@ -346,6 +355,12 @@ Now process this input and return ONLY a JSON object with exactly these fields:
         {showSuccess && (
           <div className="w-full p-4 bg-green-100 text-green-700 rounded-lg text-center">
             Event added successfully!
+          </div>
+        )}
+
+        {debugInfo && (
+          <div className="w-full p-4 bg-gray-100 text-gray-700 rounded-lg text-sm font-mono whitespace-pre-wrap">
+            {debugInfo}
           </div>
         )}
       </div>
