@@ -173,28 +173,28 @@ Example inputs and expected outputs:
 Input: "Meeting with John tomorrow at 3pm"
 {
   "title": "Meeting with John",
-  "date": "2024-03-22",
+  "date": "2025-06-22",
   "time": "15:00"
 }
 
 Input: "Lunch with Sarah at Olive Garden next Friday 12:30"
 {
   "title": "Lunch with Sarah at Olive Garden",
-  "date": "2024-03-29",
+  "date": "2025-06-25",
   "time": "12:30"
 }
 
 Input: "Doctor appointment in 2 weeks"
 {
   "title": "Doctor appointment",
-  "date": "2024-04-04",
+  "date": "2025-07-04",
   "time": "09:00"
 }
 
 Input: "Pick up kids from school at 3"
 {
   "title": "Pick up kids from school",
-  "date": "2024-03-21",
+  "date": "2025-06-22",
   "time": "15:00"
 }
 
@@ -228,7 +228,7 @@ Now process this input and return ONLY a JSON object with exactly these fields:
       const responseText = response.text().trim();
       console.log('Gemini response:', responseText);
 
-      setDebugInfo(`Gemini response: ${responseText}`);
+      setDebugInfo(`Processing response:\n${responseText}`);
 
       // Try to parse the entire response as JSON first
       try {
@@ -263,16 +263,22 @@ Now process this input and return ONLY a JSON object with exactly these fields:
           throw new Error('Invalid date or time. Please specify when the event should occur.');
         }
 
-        console.log('Adding task:', { title: eventDetails.title, date: eventDate });
-        await calendarRef.current.handleAddTask(eventDetails.title, eventDate);
-        
-        setShowSuccess(true);
-        setText('');
-        setDebugInfo(null);
-        setTimeout(() => setShowSuccess(false), 3000);
+        setDebugInfo(`Adding task to calendar:\nTitle: ${eventDetails.title}\nDate: ${eventDate.toLocaleString()}`);
+
+        try {
+          await calendarRef.current.handleAddTask(eventDetails.title, eventDate);
+          console.log('Task added successfully');
+          setShowSuccess(true);
+          setText('');
+          setDebugInfo(null);
+          setTimeout(() => setShowSuccess(false), 3000);
+        } catch (addError: any) {
+          console.error('Error adding task to calendar:', addError);
+          throw new Error(`Failed to add task to calendar: ${addError.message}`);
+        }
       } catch (jsonError: any) {
         console.error('JSON parsing error:', jsonError);
-        setDebugInfo(`JSON parsing error: ${jsonError.message}\nResponse: ${responseText}`);
+        setDebugInfo(`Error processing response:\n${jsonError.message}\n\nResponse:\n${responseText}`);
         
         // Try to extract any JSON-like structure from the response
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);

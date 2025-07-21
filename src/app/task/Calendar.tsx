@@ -61,22 +61,32 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   const handleAddTask = async (description: string, date: Date) => {
     if (!user) throw new Error('User not authenticated');
 
-    const event = {
-      title: description,
-      start_time: date.toISOString(),
-      user_id: user.id
-    };
+    try {
+      console.log('Adding task:', { description, date });
+      const event = {
+        title: description,
+        start_time: date.toISOString(),
+        user_id: user.id
+      };
 
-    const { error } = await supabaseClient
-      .from('events')
-      .insert([event]);
+      const { data, error } = await supabaseClient
+        .from('events')
+        .insert([event])
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error adding task:', error);
+      if (error) {
+        console.error('Error adding task:', error);
+        throw error;
+      }
+
+      console.log('Task added successfully:', data);
+      await fetchTasks(); // Refresh the tasks list
+      return;
+    } catch (error) {
+      console.error('Error in handleAddTask:', error);
       throw error;
     }
-
-    await fetchTasks();
   };
 
   const handleDeleteTask = async (taskId: string) => {
