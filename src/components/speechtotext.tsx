@@ -149,44 +149,74 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-      const prompt = `You are an advanced calendar event parser that understands natural language. Your task is to extract event details from any text, no matter how it's phrased.
+      const now = new Date();
+      const currentTime = now.toTimeString().split(' ')[0].slice(0, 5);
+      const currentDate = now.toISOString().split('T')[0];
+
+      const prompt = `You are an advanced calendar event parser. Your task is to extract event details from natural language text and format them consistently.
 
 Input text: "${text}"
 
-Instructions:
-1. Analyze the text carefully to understand the context and intent
-2. Extract people's names if mentioned (they're important for the title)
-3. Handle any date/time format or reference (exact or relative)
-4. Create descriptive but concise titles
-5. Maintain all important context in the title
+Current date: ${currentDate}
+Current time: ${currentTime}
 
-Examples of text variations you should handle:
-- "Meeting with Sarah next Tuesday 3pm"
-- "Remind me to call John tomorrow morning"
-- "Dentist in two weeks at 2"
-- "Lunch w/ Mike & Lisa @ Olive Garden this Friday 12:30"
-- "Need to submit report by end of day"
-- "Weekly team sync every Monday 10am"
-- "Pick up kids from school at 3"
-- "Doctor's appointment on the 15th at 2:30pm"
+Context:
+- You must extract: event title (what), date (when), time (what time), and optionally people/location
+- Always return a valid JSON object
+- Never include any explanatory text
+- If date/time is missing, use current date/time
 
-Return ONLY a JSON object with this structure:
+Example inputs and expected outputs:
+
+Input: "Meeting with John tomorrow at 3pm"
 {
-  "title": "Event title with person's name if any (e.g., 'Meeting with Sarah' or 'Call John')",
-  "date": "YYYY-MM-DD (convert relative dates like 'tomorrow', 'next Friday', etc.)",
-  "time": "HH:mm (in 24-hour format, convert times like 'morning' to appropriate hours)"
+  "title": "Meeting with John",
+  "date": "2024-03-22",
+  "time": "15:00"
 }
 
-Rules:
-1. Return ONLY the JSON object, no other text
-2. Title must be descriptive and include person's name if mentioned
-3. Convert ALL relative dates to absolute YYYY-MM-DD format
-4. Convert ALL time references to 24-hour HH:mm format
-5. Use current date for "today" or if no date specified
+Input: "Lunch with Sarah at Olive Garden next Friday 12:30"
+{
+  "title": "Lunch with Sarah at Olive Garden",
+  "date": "2024-03-29",
+  "time": "12:30"
+}
+
+Input: "Doctor appointment in 2 weeks"
+{
+  "title": "Doctor appointment",
+  "date": "2024-04-04",
+  "time": "09:00"
+}
+
+Input: "Pick up kids from school at 3"
+{
+  "title": "Pick up kids from school",
+  "date": "2024-03-21",
+  "time": "15:00"
+}
+
+Rules for processing:
+1. Title must include all context (people, location, purpose)
+2. Convert relative dates (tomorrow, next week, etc.) to YYYY-MM-DD
+3. Convert all times to 24-hour HH:mm format
+4. Default times if not specified:
+   - morning = 09:00
+   - afternoon = 14:00
+   - evening = 18:00
+   - night = 20:00
+5. Use current date if no date specified
 6. Use current time if no time specified
-7. Morning = 09:00, Afternoon = 14:00, Evening = 18:00 if not specified
-8. Handle recurring events by setting the first occurrence
-9. Keep all relevant context in the title`;
+7. Handle informal language (w/, @, tmrw, etc.)
+8. Include location in title if mentioned
+9. Keep all relevant context in title
+
+Now process this input and return ONLY a JSON object with exactly these fields:
+{
+  "title": "descriptive title with all context",
+  "date": "YYYY-MM-DD",
+  "time": "HH:mm"
+}`;
 
       console.log('Sending prompt to Gemini:', prompt);
       const result = await model.generateContent(prompt);
@@ -199,23 +229,32 @@ Rules:
         const eventDetails = JSON.parse(responseText);
         
         // Validate the required fields
-        if (!eventDetails.title) {
-          throw new Error('Event title is missing from the extracted details');
+        if (!eventDetails.title || !eventDetails.title.trim()) {
+          throw new Error('Could not determine what the event is about. Please include a clear event description.');
         }
 
         if (!eventDetails.date || !eventDetails.time) {
-          const now = new Date();
           if (!eventDetails.date) {
-            eventDetails.date = now.toISOString().split('T')[0];
+            eventDetails.date = currentDate;
           }
           if (!eventDetails.time) {
-            eventDetails.time = now.toTimeString().split(' ')[0].slice(0, 5);
+            eventDetails.time = currentTime;
           }
+        }
+
+        // Validate date format
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDetails.date)) {
+          throw new Error('Invalid date format. Please specify the date more clearly.');
+        }
+
+        // Validate time format
+        if (!/^\d{2}:\d{2}$/.test(eventDetails.time)) {
+          throw new Error('Invalid time format. Please specify the time more clearly.');
         }
 
         const eventDate = new Date(`${eventDetails.date}T${eventDetails.time}`);
         if (isNaN(eventDate.getTime())) {
-          throw new Error('Invalid date or time format in the extracted details');
+          throw new Error('Invalid date or time. Please specify when the event should occur.');
         }
 
         console.log('Adding task:', { title: eventDetails.title, date: eventDate });
@@ -225,12 +264,22 @@ Rules:
         setText('');
         setTimeout(() => setShowSuccess(false), 3000);
       } catch (jsonError) {
-        // If direct parsing fails, try to find JSON in the response
-        const jsonStr = responseText.match(/\{[\s\S]*\}/)?.[0];
-        if (!jsonStr) {
-          throw new Error('Could not understand the event details. Please try describing it differently, for example: "Meeting with John tomorrow at 3pm" or "Dentist appointment next Friday at 2:30pm"');
+        console.error('JSON parsing error:', jsonError);
+        // Try to extract any JSON-like structure from the response
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error(`Could not understand: "${text}"\n\nPlease include:\n1. What: the event description\n2. When: the date (e.g., tomorrow, next Friday)\n3. Time: when it occurs (e.g., 3pm, morning)`);
         }
-        throw new Error('Could not process the event details. Please make sure to include what, when, and optionally with whom.');
+        
+        try {
+          // Try to parse the extracted JSON
+          const extractedJson = JSON.parse(jsonMatch[0]);
+          if (!extractedJson.title || !extractedJson.date || !extractedJson.time) {
+            throw new Error('Missing required fields');
+          }
+        } catch (e) {
+          throw new Error(`Could not understand the event details. Try something like:\n- "Meeting with John tomorrow at 3pm"\n- "Lunch next Friday at 12:30"\n- "Doctor appointment on March 25th at 10am"`);
+        }
       }
     } catch (error: any) {
       console.error('Error processing text:', error);
