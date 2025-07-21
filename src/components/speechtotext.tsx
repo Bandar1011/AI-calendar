@@ -147,7 +147,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
 
     try {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
       const prompt = `You are a calendar event parser. Extract event details from this text and return ONLY a JSON object with no additional text or explanation.
 
@@ -206,7 +206,7 @@ Rules:
         setShowSuccess(true);
         setText('');
         setTimeout(() => setShowSuccess(false), 3000);
-      } catch (parseError) {
+      } catch (jsonError) {
         // If direct parsing fails, try to find JSON in the response
         const jsonStr = responseText.match(/\{[\s\S]*\}/)?.[0];
         if (!jsonStr) {
