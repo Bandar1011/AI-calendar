@@ -79,6 +79,27 @@ const Calendar = forwardRef<CalendarRef>((props, ref) => {
     await fetchTasks();
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabaseClient
+        .from('events')
+        .delete()
+        .eq('id', taskId)
+        .eq('user_id', user.id); // Only allow deleting own tasks
+
+      if (error) {
+        console.error('Error deleting task:', error);
+        return;
+      }
+
+      await fetchTasks();
+    } catch (error) {
+      console.error('Error in handleDeleteTask:', error);
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     handleAddTask
   }));
@@ -188,8 +209,10 @@ const Calendar = forwardRef<CalendarRef>((props, ref) => {
         <TimelineModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onSubmit={handleAddTask}
-          selectedDate={selectedDate}
+          date={selectedDate}
+          tasks={tasks}
+          onAddTask={handleAddTask}
+          onDeleteTask={handleDeleteTask}
         />
       )}
     </div>
