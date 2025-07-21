@@ -1,19 +1,19 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { currentUser } from "@clerk/nextjs";
+import { getAuth } from "@clerk/nextjs/server";
 import { supabaseClient } from '@/lib/supabaseClient';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const { userId } = getAuth(request);
     
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { data: events, error } = await supabaseClient
       .from('events')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('start_time', { ascending: true });
 
     if (error) {
@@ -30,9 +30,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const { userId } = getAuth(request);
     
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       description: body.description,
       start_time: new Date(body.start_time).toISOString(),
       end_time: new Date(body.end_time).toISOString(),
-      user_id: user.id
+      user_id: userId
     };
 
     const { data, error } = await supabaseClient
@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const { userId } = getAuth(request);
     
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -78,7 +78,7 @@ export async function DELETE(request: NextRequest) {
       .from('events')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id); // Ensure users can only delete their own events
+      .eq('user_id', userId); // Ensure users can only delete their own events
 
     if (error) {
       console.error('Error deleting event:', error);
