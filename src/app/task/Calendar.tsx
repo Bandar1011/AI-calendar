@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import TimelineModal from './TimelineModal';
 import { supabaseClient } from '@/lib/supabaseClient';
@@ -26,43 +26,44 @@ const Calendar = forwardRef<CalendarRef>((props, ref) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { user } = useUser();
 
-  // Get current date info for today's date highlight only
+  // Get current date info for today's date highlight
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
   const currentDay = currentDate.getDate();
 
+  const fetchTasks = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data: events, error } = await supabaseClient
+        .from('events')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('start_time', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching events:', error.message);
+        return;
+      }
+
+      if (events) {
+        setTasks(events);
+      }
+    } catch (error) {
+      console.error('Error in fetchTasks:', error);
+    }
+  }, [user]); // Added user to dependencies to ensure it's available
+
   useEffect(() => {
     if (user) {
       fetchTasks();
     }
-  }, [user]);
+  }, [fetchTasks, user]); // Added user to dependencies
 
   useImperativeHandle(ref, () => ({
     handleAddTask
   }));
-
-  const fetchTasks = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabaseClient
-        .from('events')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error fetching tasks:', error.message);
-        return;
-      }
-
-      if (data) {
-        setTasks(data);
-      }
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    }
-  };
 
   const handleAddTask = async (taskDescription: string, date: Date) => {
     if (!user) {

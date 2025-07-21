@@ -38,7 +38,6 @@ export default function TimelineModal({ isOpen, onClose, date, tasks, onAddTask,
   const getTasksForHour = (hour: number) => {
     return tasks.filter(task => {
       const taskStartTime = new Date(task.start_time);
-      const taskEndTime = new Date(task.end_time);
       const currentHour = taskStartTime.getHours();
       return currentHour === hour;
     });
