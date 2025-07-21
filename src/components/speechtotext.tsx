@@ -149,26 +149,44 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-      const prompt = `You are a calendar event parser. Extract event details from this text and return ONLY a JSON object with no additional text or explanation.
+      const prompt = `You are an advanced calendar event parser that understands natural language. Your task is to extract event details from any text, no matter how it's phrased.
 
 Input text: "${text}"
 
-Required JSON format:
+Instructions:
+1. Analyze the text carefully to understand the context and intent
+2. Extract people's names if mentioned (they're important for the title)
+3. Handle any date/time format or reference (exact or relative)
+4. Create descriptive but concise titles
+5. Maintain all important context in the title
+
+Examples of text variations you should handle:
+- "Meeting with Sarah next Tuesday 3pm"
+- "Remind me to call John tomorrow morning"
+- "Dentist in two weeks at 2"
+- "Lunch w/ Mike & Lisa @ Olive Garden this Friday 12:30"
+- "Need to submit report by end of day"
+- "Weekly team sync every Monday 10am"
+- "Pick up kids from school at 3"
+- "Doctor's appointment on the 15th at 2:30pm"
+
+Return ONLY a JSON object with this structure:
 {
-  "title": "extracted event title (required)",
-  "date": "YYYY-MM-DD (use today's date if not specified)",
-  "time": "HH:mm (use current time if not specified)"
+  "title": "Event title with person's name if any (e.g., 'Meeting with Sarah' or 'Call John')",
+  "date": "YYYY-MM-DD (convert relative dates like 'tomorrow', 'next Friday', etc.)",
+  "time": "HH:mm (in 24-hour format, convert times like 'morning' to appropriate hours)"
 }
 
 Rules:
 1. Return ONLY the JSON object, no other text
-2. Title is required
-3. Use today's date if no date is specified
-4. Use current time if no time is specified
-5. Dates should be in YYYY-MM-DD format
-6. Times should be in 24-hour HH:mm format
-7. Handle relative dates like "tomorrow", "next Friday", etc.
-8. Extract as much context as possible for the title`;
+2. Title must be descriptive and include person's name if mentioned
+3. Convert ALL relative dates to absolute YYYY-MM-DD format
+4. Convert ALL time references to 24-hour HH:mm format
+5. Use current date for "today" or if no date specified
+6. Use current time if no time specified
+7. Morning = 09:00, Afternoon = 14:00, Evening = 18:00 if not specified
+8. Handle recurring events by setting the first occurrence
+9. Keep all relevant context in the title`;
 
       console.log('Sending prompt to Gemini:', prompt);
       const result = await model.generateContent(prompt);
@@ -210,9 +228,9 @@ Rules:
         // If direct parsing fails, try to find JSON in the response
         const jsonStr = responseText.match(/\{[\s\S]*\}/)?.[0];
         if (!jsonStr) {
-          throw new Error('Could not extract valid JSON from the response. Please try rephrasing your event details.');
+          throw new Error('Could not understand the event details. Please try describing it differently, for example: "Meeting with John tomorrow at 3pm" or "Dentist appointment next Friday at 2:30pm"');
         }
-        throw new Error('Failed to parse the response. Please try again with clearer event details.');
+        throw new Error('Could not process the event details. Please make sure to include what, when, and optionally with whom.');
       }
     } catch (error: any) {
       console.error('Error processing text:', error);
