@@ -1,13 +1,9 @@
 "use client";
 
 import React, { useRef } from 'react';
-import Calendar from './Calendar';
+import Calendar, { CalendarRef } from './Calendar';
 import SpeechToText from '@/components/speechtotext';
 import { useUser } from '@clerk/nextjs';
-
-interface CalendarRef {
-  handleAddTask: (description: string, date: Date) => Promise<void>;
-}
 
 export default function TaskPage() {
   const calendarRef = useRef<CalendarRef>(null);

@@ -2,13 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-
-interface CalendarRef {
-  handleAddTask: (description: string, date: Date) => Promise<void>;
-}
+import { CalendarRef } from '@/app/task/Calendar';
 
 interface SpeechToTextProps {
-  calendarRef: React.RefObject<CalendarRef>;
+  calendarRef: React.RefObject<CalendarRef | null>;
 }
 
 const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
