@@ -57,27 +57,29 @@ const Calendar = forwardRef<CalendarRef>((props, ref) => {
     }
   }, [fetchTasks, user]);
 
-  useImperativeHandle(ref, () => ({
-    handleAddTask: async (description: string, date: Date) => {
-      if (!user) throw new Error('User not authenticated');
+  const handleAddTask = async (description: string, date: Date) => {
+    if (!user) throw new Error('User not authenticated');
 
-      const event = {
-        title: description,
-        start_time: date.toISOString(),
-        user_id: user.id
-      };
+    const event = {
+      title: description,
+      start_time: date.toISOString(),
+      user_id: user.id
+    };
 
-      const { error } = await supabaseClient
-        .from('events')
-        .insert([event]);
+    const { error } = await supabaseClient
+      .from('events')
+      .insert([event]);
 
-      if (error) {
-        console.error('Error adding task:', error);
-        throw error;
-      }
-
-      await fetchTasks();
+    if (error) {
+      console.error('Error adding task:', error);
+      throw error;
     }
+
+    await fetchTasks();
+  };
+
+  useImperativeHandle(ref, () => ({
+    handleAddTask
   }));
 
   const handleDateClick = (date: Date) => {
@@ -99,32 +101,6 @@ const Calendar = forwardRef<CalendarRef>((props, ref) => {
     }
   };
 
-  const handleAddTask = async (description: string, date: Date) => {
-    if (!user) return;
-
-    try {
-      const event = {
-        title: description,
-        start_time: date.toISOString(),
-        user_id: user.id
-      };
-
-      const { error } = await supabaseClient
-        .from('events')
-        .insert([event]);
-
-      if (error) {
-        console.error('Error adding task:', error);
-        return;
-      }
-
-      await fetchTasks();
-    } catch (error) {
-      console.error('Error in handleAddTask:', error);
-    }
-  };
-
-  // Calendar rendering logic...
   return (
     <div className="bg-navy-800 p-6 rounded-lg shadow-lg">
       <div className="grid grid-cols-7 gap-1">
