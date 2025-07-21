@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CalendarRef } from '@/app/task/Calendar';
 
 interface SpeechToTextProps {
-  calendarRef: React.RefObject<CalendarRef>;
+  calendarRef: React.RefObject<CalendarRef | null>;
 }
 
 const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {

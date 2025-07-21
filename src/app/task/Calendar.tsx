@@ -16,7 +16,7 @@ interface Task {
   user_id: string;
 }
 
-const Calendar = forwardRef<CalendarRef>((props, ref) => {
+const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   const [year, setYear] = useState(new Date().getFullYear());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);

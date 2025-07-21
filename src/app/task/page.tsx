@@ -5,8 +5,12 @@ import Calendar, { CalendarRef } from './Calendar';
 import SpeechToText from '@/components/speechtotext';
 import { useUser } from '@clerk/nextjs';
 
+type CalendarRefType = {
+  handleAddTask: (description: string, date: Date) => Promise<void>;
+};
+
 export default function TaskPage() {
-  const calendarRef = useRef<CalendarRef>(null);
+  const calendarRef = useRef<CalendarRefType>(null);
   const { isLoaded, isSignedIn } = useUser();
 
   if (!isLoaded || !isSignedIn) {
