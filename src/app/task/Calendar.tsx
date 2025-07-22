@@ -30,6 +30,12 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   const currentMonth = currentDate.getMonth();
   const currentDay = currentDate.getDate();
 
+  const isSameDay = (date1: Date, date2: Date) => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  };
+
   const fetchTasks = useCallback(async () => {
     if (!user) return;
 
@@ -53,12 +59,13 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
       }
 
       if (events) {
+        console.log('Fetched events:', events);
         setTasks(events);
       }
     } catch (error) {
       console.error('Error in fetchTasks:', error);
     }
-  }, [user, year]); // Add year as dependency
+  }, [user, year]);
 
   useEffect(() => {
     if (user) {
@@ -79,7 +86,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
       const event = {
         title: description,
         start_time: date.toISOString(),
-        end_time: endDate.toISOString(), // Add end_time 1 hour after start_time
+        end_time: endDate.toISOString(),
         user_id: user.id
       };
 
@@ -187,22 +194,13 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
                     return <div key={`empty-${dateIndex}`} />;
                   }
 
-                  const isSelected = selectedDate &&
-                    selectedDate.getFullYear() === year &&
-                    selectedDate.getMonth() === monthIndex &&
-                    selectedDate.getDate() === date;
-
-                  const isToday = currentYear === year && 
-                    currentMonth === monthIndex && 
-                    currentDay === date;
+                  const currentDateForCell = new Date(year, monthIndex, date);
+                  const isSelected = selectedDate && isSameDay(selectedDate, currentDateForCell);
+                  const isToday = isSameDay(currentDate, currentDateForCell);
 
                   const dayTasks = tasks.filter(task => {
                     const taskDate = new Date(task.start_time);
-                    return (
-                      taskDate.getFullYear() === year &&
-                      taskDate.getMonth() === monthIndex &&
-                      taskDate.getDate() === date
-                    );
+                    return isSameDay(taskDate, currentDateForCell);
                   });
 
                   return (
@@ -231,12 +229,12 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
         })}
       </div>
 
-      {isModalOpen && (
+      {isModalOpen && selectedDate && (
         <TimelineModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           date={selectedDate}
-          tasks={tasks}
+          tasks={tasks.filter(task => isSameDay(new Date(task.start_time), selectedDate))}
           onAddTask={handleAddTask}
           onDeleteTask={handleDeleteTask}
         />
