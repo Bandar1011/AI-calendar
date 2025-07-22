@@ -26,9 +26,6 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
 
   // Get current date info for today's date highlight
   const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
-  const currentDay = currentDate.getDate();
 
   const isSameDay = (date1: Date, date2: Date) => {
     return date1.getFullYear() === date2.getFullYear() &&
@@ -36,13 +33,18 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
            date1.getDate() === date2.getDate();
   };
 
+  const toLocalDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+  };
+
   const fetchTasks = useCallback(async () => {
     if (!user) return;
 
     try {
-      // Get the start of the year
+      // Get the start of the year in local timezone
       const startDate = new Date(year, 0, 1);
-      // Get the end of the year
+      // Get the end of the year in local timezone
       const endDate = new Date(year, 11, 31, 23, 59, 59, 999);
 
       const { data: events, error } = await supabaseClient
@@ -199,7 +201,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
                   const isToday = isSameDay(currentDate, currentDateForCell);
 
                   const dayTasks = tasks.filter(task => {
-                    const taskDate = new Date(task.start_time);
+                    const taskDate = toLocalDate(task.start_time);
                     return isSameDay(taskDate, currentDateForCell);
                   });
 
@@ -234,7 +236,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           date={selectedDate}
-          tasks={tasks.filter(task => isSameDay(new Date(task.start_time), selectedDate))}
+          tasks={tasks.filter(task => isSameDay(toLocalDate(task.start_time), selectedDate))}
           onAddTask={handleAddTask}
           onDeleteTask={handleDeleteTask}
         />

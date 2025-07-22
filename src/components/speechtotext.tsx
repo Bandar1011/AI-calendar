@@ -168,9 +168,26 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
+      // Get current date in local timezone
       const now = new Date();
-      const currentTime = now.toTimeString().split(' ')[0].slice(0, 5);
-      const currentDate = now.toISOString().split('T')[0];
+      const userTimezoneOffset = now.getTimezoneOffset() * 60000; // Convert offset to milliseconds
+      const localDate = new Date(now.getTime() - userTimezoneOffset);
+      
+      const currentTime = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: false 
+      });
+      const currentDate = localDate.toISOString().split('T')[0];
+
+      // Calculate tomorrow's date in local timezone
+      const tomorrow = new Date(now.getTime() - userTimezoneOffset + 24 * 60 * 60 * 1000);
+      const tomorrowDate = tomorrow.toISOString().split('T')[0];
+
+      // Calculate next Friday's date in local timezone
+      const nextFriday = new Date(now.getTime() - userTimezoneOffset);
+      nextFriday.setDate(nextFriday.getDate() + ((7 - nextFriday.getDay() + 5) % 7 || 7));
+      const nextFridayDate = nextFriday.toISOString().split('T')[0];
 
       const prompt = `You are an advanced calendar event parser. Your task is to extract event details from natural language text and format them consistently.
 
@@ -184,10 +201,11 @@ Context:
 - Always return a valid JSON object
 - Never include any explanatory text or markdown formatting
 - If date/time is missing, use current date/time
-- For "today", use current date
-- For "tomorrow", add 1 day to current date
-- For "next [day]", find the next occurrence of that day
+- For "today", use current date (${currentDate})
+- For "tomorrow", use tomorrow's date (${tomorrowDate})
+- For "next Friday", use next Friday's date (${nextFridayDate})
 - For relative dates, calculate from current date
+- All times should be in 24-hour format
 
 Example inputs and outputs:
 
@@ -201,18 +219,14 @@ Input: "Meeting with John today at 3pm"
 Input: "Lunch with Sarah tomorrow at 12:30"
 {
   "title": "Lunch with Sarah",
-  "date": "${new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}",
+  "date": "${tomorrowDate}",
   "time": "12:30"
 }
 
 Input: "Doctor appointment next Friday at 10am"
 {
   "title": "Doctor appointment",
-  "date": "${(() => {
-    const date = new Date();
-    date.setDate(date.getDate() + ((7 - date.getDay() + 5) % 7 || 7));
-    return date.toISOString().split('T')[0];
-  })()}",
+  "date": "${nextFridayDate}",
   "time": "10:00"
 }
 
@@ -247,6 +261,9 @@ IMPORTANT: Return ONLY the JSON object without any markdown formatting or code b
 
       console.log('Processing text:', text);
       console.log('Current date:', currentDate);
+      console.log('Current time:', currentTime);
+      console.log('Tomorrow date:', tomorrowDate);
+      console.log('Next Friday date:', nextFridayDate);
       console.log('Sending prompt to Gemini:', prompt);
       
       const result = await model.generateContent(prompt);
@@ -288,7 +305,11 @@ IMPORTANT: Return ONLY the JSON object without any markdown formatting or code b
           throw new Error('Invalid time format. Please specify the time more clearly.');
         }
 
-        const eventDate = new Date(`${eventDetails.date}T${eventDetails.time}`);
+        // Create date in local timezone
+        const [year, month, day] = eventDetails.date.split('-').map(Number);
+        const [hours, minutes] = eventDetails.time.split(':').map(Number);
+        const eventDate = new Date(year, month - 1, day, hours, minutes);
+
         if (isNaN(eventDate.getTime())) {
           throw new Error('Invalid date or time. Please specify when the event should occur.');
         }
