@@ -184,34 +184,42 @@ Context:
 - Always return a valid JSON object
 - Never include any explanatory text or markdown formatting
 - If date/time is missing, use current date/time
+- For "today", use current date
+- For "tomorrow", add 1 day to current date
+- For "next [day]", find the next occurrence of that day
+- For relative dates, calculate from current date
 
 Example inputs and outputs:
 
-Input: "Meeting with John tomorrow at 3pm"
+Input: "Meeting with John today at 3pm"
 {
   "title": "Meeting with John",
-  "date": "2025-06-22",
+  "date": "${currentDate}",
   "time": "15:00"
 }
 
-Input: "Lunch with Sarah at Olive Garden next Friday 12:30"
+Input: "Lunch with Sarah tomorrow at 12:30"
 {
-  "title": "Lunch with Sarah at Olive Garden",
-  "date": "2025-06-25",
+  "title": "Lunch with Sarah",
+  "date": "${new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}",
   "time": "12:30"
 }
 
-Input: "Doctor appointment in 2 weeks"
+Input: "Doctor appointment next Friday at 10am"
 {
   "title": "Doctor appointment",
-  "date": "2025-07-04",
-  "time": "09:00"
+  "date": "${(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + ((7 - date.getDay() + 5) % 7 || 7));
+    return date.toISOString().split('T')[0];
+  })()}",
+  "time": "10:00"
 }
 
-Input: "Pick up kids from school at 3"
+Input: "Team meeting at 3pm"
 {
-  "title": "Pick up kids from school",
-  "date": "2025-06-22",
+  "title": "Team meeting",
+  "date": "${currentDate}",
   "time": "15:00"
 }
 
@@ -238,6 +246,7 @@ IMPORTANT: Return ONLY the JSON object without any markdown formatting or code b
 }`;
 
       console.log('Processing text:', text);
+      console.log('Current date:', currentDate);
       console.log('Sending prompt to Gemini:', prompt);
       
       const result = await model.generateContent(prompt);
@@ -300,7 +309,7 @@ IMPORTANT: Return ONLY the JSON object without any markdown formatting or code b
       } catch (jsonError: any) {
         console.error('JSON parsing error:', jsonError);
         setDebugInfo(`Error processing response:\n${jsonError.message}\n\nResponse:\n${responseText}`);
-        throw new Error(`Could not understand: "${text}"\n\nPlease include:\n1. What: the event description\n2. When: the date (e.g., tomorrow, next Friday)\n3. Time: when it occurs (e.g., 3pm, morning)`);
+        throw new Error(`Could not understand: "${text}"\n\nPlease include:\n1. What: the event description\n2. When: the date (e.g., today, tomorrow, next Friday)\n3. Time: when it occurs (e.g., 3pm, morning)`);
       }
     } catch (error: any) {
       console.error('Error processing text:', error);

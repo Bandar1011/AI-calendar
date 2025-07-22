@@ -34,10 +34,17 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
     if (!user) return;
 
     try {
+      // Get the start of the year
+      const startDate = new Date(year, 0, 1);
+      // Get the end of the year
+      const endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+
       const { data: events, error } = await supabaseClient
         .from('events')
         .select('*')
         .eq('user_id', user.id)
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString())
         .order('start_time', { ascending: true });
 
       if (error) {
@@ -51,7 +58,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
     } catch (error) {
       console.error('Error in fetchTasks:', error);
     }
-  }, [user]);
+  }, [user, year]); // Add year as dependency
 
   useEffect(() => {
     if (user) {
