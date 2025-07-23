@@ -158,7 +158,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
 
   return (
     <div className="bg-[#1a1a1a] text-white">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-8">
         <button onClick={handlePrevYear} className="px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
           Previous Year
         </button>
@@ -168,7 +168,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {months.map((month, monthIndex) => {
           const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
           const firstDayOfMonth = new Date(year, monthIndex, 1).getDay();
@@ -183,17 +183,19 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
           }
 
           return (
-            <div key={monthIndex} className="border border-gray-800 rounded-lg p-4 bg-[#242424]">
-              <h2 className="font-bold text-center mb-2 text-gray-400">{month}</h2>
-              <div className="grid grid-cols-7 gap-1 text-center text-sm mb-1">
+            <div key={monthIndex} className="border border-gray-800 rounded-lg p-6 bg-[#242424]">
+              <h2 className="font-bold text-center mb-4 text-gray-400 text-lg">{month}</h2>
+              <div className="grid grid-cols-7 gap-2 text-center mb-2">
                 {days.map(day => (
-                  <div key={day} className="font-semibold text-gray-500">{day}</div>
+                  <div key={day} className="font-medium text-gray-500 text-sm py-1">
+                    {day}
+                  </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1 text-center text-sm">
+              <div className="grid grid-cols-7 gap-2 text-center">
                 {monthDates.map((date, dateIndex) => {
                   if (!date) {
-                    return <div key={`empty-${dateIndex}`} />;
+                    return <div key={`empty-${dateIndex}`} className="aspect-square" />;
                   }
 
                   const currentDateForCell = new Date(year, monthIndex, date);
@@ -206,20 +208,20 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
                   });
 
                   return (
-                    <div key={`date-${dateIndex}`} className="p-1">
+                    <div key={`date-${dateIndex}`} className="aspect-square p-1">
                       <button
                         onClick={() => handleDayClick(date, monthIndex)}
-                        className={`w-full h-7 rounded flex items-center justify-center transition-colors relative ${
+                        className={`w-full h-full rounded-lg flex items-center justify-center transition-colors relative text-sm ${
                           isSelected
                             ? 'bg-gray-700 text-white'
                             : isToday
-                              ? 'bg-gray-800 text-white font-semibold'
+                              ? 'bg-gray-800 text-white font-medium'
                               : 'hover:bg-gray-700'
                         }`}
                       >
                         {date}
                         {dayTasks.length > 0 && (
-                          <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full" />
+                          <span className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full" />
                         )}
                       </button>
                     </div>
