@@ -23,6 +23,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ calendarRef }) => {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -340,69 +341,99 @@ IMPORTANT: Return ONLY the JSON object without any markdown formatting or code b
     }
   };
 
-  return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <div className="flex flex-col items-center space-y-4">
-        <div className="flex space-x-4">
-          <button
-            onClick={isListening ? stopListening : startListening}
-            className={`px-6 py-3 rounded-full font-semibold flex items-center ${
-              isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
-            } text-white transition-colors`}
-          >
-            {isListening ? (
-              <>
-                <span className="mr-2 animate-pulse">⚫</span>
-                Stop Recording
-              </>
-            ) : (
-              'Start Recording'
-            )}
-          </button>
-          <button
-            onClick={clearText}
-            className="px-6 py-3 rounded-full bg-gray-500 hover:bg-gray-600 text-white font-semibold transition-colors"
-          >
-            Clear
-          </button>
-        </div>
+  // Adjust textarea height based on content
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  };
 
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [text]);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Chat Messages Area */}
+      <div className="flex-1 space-y-4 mb-4">
         {error && (
-          <div className="w-full p-4 bg-red-100 text-red-700 rounded-lg text-center whitespace-pre-line">
+          <div className="p-3 rounded-lg bg-red-900/50 text-red-200 text-sm">
             {error}
           </div>
         )}
-
-        <div className="w-full">
-          <textarea
-            value={text}
-            onChange={handleTextChange}
-            className="w-full p-4 border border-gray-300 rounded-lg min-h-[100px] resize-y text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Speak or type your event details here... (e.g., 'Team meeting tomorrow at 2:30 PM')"
-          />
-        </div>
-
-        <button
-          onClick={processText}
-          disabled={!text.trim() || isProcessing}
-          className={`px-6 py-3 rounded-full font-semibold transition-colors ${
-            !text.trim() || isProcessing
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600'
-          } text-white`}
-        >
-          {isProcessing ? 'Processing...' : 'Process Text'}
-        </button>
-
         {showSuccess && (
-          <div className="w-full p-4 bg-green-100 text-green-700 rounded-lg text-center">
-            Event added successfully!
+          <div className="p-3 rounded-lg bg-green-900/50 text-green-200 text-sm">
+            Task added successfully!
           </div>
         )}
-
         {debugInfo && (
-          <div className="w-full p-4 bg-gray-100 text-gray-700 rounded-lg text-sm font-mono whitespace-pre-wrap">
+          <div className="p-3 rounded-lg bg-gray-800 text-gray-300 text-sm font-mono whitespace-pre-wrap">
             {debugInfo}
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className="flex flex-col gap-3">
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type your task or use voice input..."
+            className="w-full resize-none bg-gray-800 text-white rounded-lg pl-4 pr-24 py-3 min-h-[44px] max-h-[200px] focus:outline-none focus:ring-1 focus:ring-gray-600"
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (text.trim()) {
+                  processText();
+                }
+              }
+            }}
+          />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+            <button
+              onClick={() => isListening ? stopListening() : startListening()}
+              className={`p-2 rounded-md transition-colors ${
+                isListening 
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
+                  : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+              }`}
+              title={isListening ? 'Stop recording' : 'Start recording'}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                  d={isListening 
+                    ? "M21 12a9 9 0 11-18 0 9 9 0 0118 0z M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+                    : "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                  }
+                />
+              </svg>
+            </button>
+            <button
+              onClick={processText}
+              disabled={!text.trim() || isProcessing}
+              className={`p-2 rounded-md transition-colors ${
+                text.trim() && !isProcessing
+                  ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                  : 'bg-gray-700 text-gray-500'
+              }`}
+              title="Process text"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {isListening && (
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            Recording...
           </div>
         )}
       </div>

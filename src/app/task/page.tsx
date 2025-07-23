@@ -14,16 +14,34 @@ export default function TaskPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Task Calendar</h1>
-        <UserButton afterSignOutUrl="/" />
-      </div>
-      <div className="max-w-2xl mx-auto mb-8">
-        <SpeechToText calendarRef={calendarRef} />
-      </div>
-      <div className="w-full">
-        <Calendar ref={calendarRef} />
+    <div className="min-h-screen bg-[#1a1a1a]">
+      {/* Header */}
+      <header className="border-b border-gray-800 bg-[#1a1a1a] px-4 py-3">
+        <div className="container mx-auto flex justify-between items-center">
+          <h1 className="text-xl font-semibold text-white">Task Calendar</h1>
+          <UserButton afterSignOutUrl="/" />
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="container mx-auto flex h-[calc(100vh-64px)]">
+        {/* Calendar Section */}
+        <div className="flex-1 p-4 overflow-auto">
+          <Calendar ref={calendarRef} />
+        </div>
+
+        {/* Chat Section */}
+        <div className="w-[400px] border-l border-gray-800 bg-[#1a1a1a] flex flex-col">
+          <div className="p-4 border-b border-gray-800">
+            <h2 className="text-sm font-medium text-gray-400">Calendar Assistant</h2>
+          </div>
+          <div className="flex-1 overflow-auto p-4">
+            {/* Chat messages would go here */}
+          </div>
+          <div className="p-4 border-t border-gray-800">
+            <SpeechToText calendarRef={calendarRef} />
+          </div>
+        </div>
       </div>
     </div>
   );

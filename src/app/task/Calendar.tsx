@@ -122,7 +122,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
         .from('events')
         .delete()
         .eq('id', taskId)
-        .eq('user_id', user.id); // Only allow deleting own tasks
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Error deleting task:', error);
@@ -157,13 +157,13 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="bg-[#1a1a1a] text-white">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={handlePrevYear} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+        <button onClick={handlePrevYear} className="px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
           Previous Year
         </button>
         <h1 className="text-2xl font-bold">{year}</h1>
-        <button onClick={handleNextYear} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+        <button onClick={handleNextYear} className="px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
           Next Year
         </button>
       </div>
@@ -183,11 +183,11 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
           }
 
           return (
-            <div key={monthIndex} className="border border-gray-200 rounded-lg p-4">
-              <h2 className="font-bold text-center mb-2">{month}</h2>
+            <div key={monthIndex} className="border border-gray-800 rounded-lg p-4 bg-[#242424]">
+              <h2 className="font-bold text-center mb-2 text-gray-400">{month}</h2>
               <div className="grid grid-cols-7 gap-1 text-center text-sm mb-1">
                 {days.map(day => (
-                  <div key={day} className="font-semibold text-gray-600">{day}</div>
+                  <div key={day} className="font-semibold text-gray-500">{day}</div>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1 text-center text-sm">
@@ -211,10 +211,10 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
                         onClick={() => handleDayClick(date, monthIndex)}
                         className={`w-full h-7 rounded flex items-center justify-center transition-colors relative ${
                           isSelected
-                            ? 'bg-blue-500 text-white'
+                            ? 'bg-gray-700 text-white'
                             : isToday
-                              ? 'bg-green-100 text-green-800 font-semibold'
-                              : 'hover:bg-gray-100'
+                              ? 'bg-gray-800 text-white font-semibold'
+                              : 'hover:bg-gray-700'
                         }`}
                       >
                         {date}
