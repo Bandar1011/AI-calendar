@@ -1,9 +1,21 @@
 'use client';
 
-import { SignIn } from "@clerk/nextjs";
+import { SignIn, useAuth } from "@clerk/nextjs";
 import Image from "next/image";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    // If user is signed in, redirect to the calendar page
+    if (isSignedIn) {
+      router.push('/task');
+    }
+  }, [isSignedIn, router]);
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
       <div className="text-center mb-8">
@@ -44,6 +56,8 @@ export default function Home() {
               card: 'bg-white shadow-none',
             }
           }}
+          redirectUrl="/task"
+          afterSignInUrl="/task"
         />
       </div>
     </div>

@@ -4,6 +4,14 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
+  const { userId } = await auth();
+  const { pathname } = req.nextUrl;
+
+  // If user is signed in and trying to access public routes (except root), redirect to calendar
+  if (userId && isPublicRoute(req) && pathname !== '/') {
+    return Response.redirect(new URL('/task', req.url));
+  }
+
   // If it's not a public route, protect it
   if (!isPublicRoute(req)) {
     await auth.protect();

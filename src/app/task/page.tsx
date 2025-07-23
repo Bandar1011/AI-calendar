@@ -1,16 +1,12 @@
 "use client";
 
-import React, { useRef } from 'react';
-import Calendar from './Calendar';
+import { useRef } from 'react';
+import { useUser, UserButton } from '@clerk/nextjs';
+import Calendar, { CalendarRef } from './Calendar';
 import SpeechToText from '@/components/speechtotext';
-import { useUser } from '@clerk/nextjs';
-
-type CalendarRefType = {
-  handleAddTask: (description: string, date: Date) => Promise<void>;
-};
 
 export default function TaskPage() {
-  const calendarRef = useRef<CalendarRefType>(null);
+  const calendarRef = useRef<CalendarRef>(null);
   const { isLoaded, isSignedIn } = useUser();
 
   if (!isLoaded || !isSignedIn) {
@@ -19,7 +15,10 @@ export default function TaskPage() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <h1 className="text-3xl font-bold text-center mb-8">Task Calendar</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Task Calendar</h1>
+        <UserButton afterSignOutUrl="/" />
+      </div>
       <div className="max-w-2xl mx-auto mb-8">
         <SpeechToText calendarRef={calendarRef} />
       </div>
