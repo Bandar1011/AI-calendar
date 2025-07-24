@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useUser, UserButton } from '@clerk/nextjs';
 import Calendar, { CalendarRef } from './Calendar';
 import SpeechToText from '@/components/speechtotext';
@@ -10,25 +10,40 @@ export default function TaskPage() {
   const { isLoaded, isSignedIn } = useUser();
   const [chatWidth, setChatWidth] = useState(400);
   const [isDragging, setIsDragging] = useState(false);
+  const dragHandleRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     setIsDragging(true);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging) {
-      const newWidth = window.innerWidth - e.clientX;
-      setChatWidth(Math.max(300, Math.min(800, newWidth)));
-    }
-  };
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
 
-  const handleMouseUp = () => {
+    const newWidth = window.innerWidth - e.clientX;
+    // Ensure the chat panel stays between 300px and 800px
+    const clampedWidth = Math.max(300, Math.min(800, newWidth));
+    setChatWidth(clampedWidth);
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   if (!isLoaded || !isSignedIn) {
     return null;
@@ -37,7 +52,7 @@ export default function TaskPage() {
   return (
     <div className="min-h-screen bg-[#1a1a1a]">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-[#1a1a1a] px-4 py-3">
+      <header className="border-b border-gray-800 bg-[#1a1a1a] px-4 py-3 sticky top-0 z-10">
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-semibold text-white">Task Calendar</h1>
           <UserButton afterSignOutUrl="/" />
@@ -45,7 +60,7 @@ export default function TaskPage() {
       </header>
 
       {/* Main Content */}
-      <div className="flex h-[calc(100vh-64px)]">
+      <div className="flex h-[calc(100vh-64px)] relative">
         {/* Calendar Section */}
         <div className="flex-1 p-4 overflow-auto min-w-0">
           <Calendar ref={calendarRef} />
@@ -53,16 +68,21 @@ export default function TaskPage() {
 
         {/* Resize Handle */}
         <div
-          className={`w-1 hover:bg-blue-500/50 cursor-col-resize transition-colors ${
-            isDragging ? 'bg-blue-500/50' : 'bg-gray-800'
-          }`}
+          ref={dragHandleRef}
+          className={`w-1 cursor-col-resize hover:w-2 group relative ${
+            isDragging ? 'bg-blue-500/50 w-2' : 'bg-gray-800'
+          } transition-[width,background-color] duration-150`}
           onMouseDown={handleMouseDown}
-        />
+        >
+          <div className={`absolute inset-y-0 -left-2 right-2 group-hover:bg-blue-500/20 ${
+            isDragging ? 'bg-blue-500/20' : ''
+          }`} />
+        </div>
 
         {/* Chat Section */}
         <div 
           className="border-l border-gray-800 bg-[#1a1a1a] flex flex-col"
-          style={{ width: `${chatWidth}px` }}
+          style={{ width: `${chatWidth}px`, minWidth: '300px', maxWidth: '800px' }}
         >
           <div className="p-4 border-b border-gray-800">
             <h2 className="text-sm font-medium text-gray-400">Calendar Assistant</h2>
@@ -78,7 +98,7 @@ export default function TaskPage() {
 
       {/* Overlay when dragging */}
       {isDragging && (
-        <div className="fixed inset-0 z-50 cursor-col-resize" />
+        <div className="fixed inset-0 z-50 bg-transparent" />
       )}
     </div>
   );
