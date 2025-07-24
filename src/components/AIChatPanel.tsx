@@ -62,6 +62,16 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
         hour12: false 
       });
 
+      // Helper function to format date as YYYY-MM-DD
+      const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+      // Calculate next 7 days for examples
+      const nextWeekDates = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() + i);
+        return formatDate(date);
+      });
+
       const prompt = `You are an advanced calendar assistant that helps users plan and schedule events. Your task is to understand the user's request and create appropriate calendar events.
 
 Current date: ${currentDate}
@@ -71,9 +81,9 @@ User request: "${message}"
 
 Instructions:
 1. Analyze the request to determine if it's about:
-   - Creating single/recurring events
+   - Creating single events
+   - Creating recurring events (daily, weekly, etc.)
    - Planning schedules
-   - Modifying existing events
    - Getting calendar information
 
 2. For event creation, extract:
@@ -82,7 +92,9 @@ Instructions:
    - Recurrence pattern (if any)
    - Additional context
 
-3. Return a JSON array of events to create, following this format:
+3. For recurring events, create separate events for each occurrence.
+
+4. Return a JSON array of events to create, following this format:
 [
   {
     "title": "descriptive title with context",
@@ -92,13 +104,52 @@ Instructions:
   }
 ]
 
-4. If the request requires clarification or can't be processed as events, return:
+5. If the request requires clarification or can't be processed as events, return:
 {
   "type": "message",
   "content": "your response explaining what you need or providing information"
 }
 
 Examples:
+
+Input: "Add a meeting at 2pm every day for a week"
+[
+  {
+    "title": "Daily Meeting",
+    "date": "${nextWeekDates[0]}",
+    "time": "14:00"
+  },
+  {
+    "title": "Daily Meeting",
+    "date": "${nextWeekDates[1]}",
+    "time": "14:00"
+  },
+  {
+    "title": "Daily Meeting",
+    "date": "${nextWeekDates[2]}",
+    "time": "14:00"
+  },
+  {
+    "title": "Daily Meeting",
+    "date": "${nextWeekDates[3]}",
+    "time": "14:00"
+  },
+  {
+    "title": "Daily Meeting",
+    "date": "${nextWeekDates[4]}",
+    "time": "14:00"
+  },
+  {
+    "title": "Daily Meeting",
+    "date": "${nextWeekDates[5]}",
+    "time": "14:00"
+  },
+  {
+    "title": "Daily Meeting",
+    "date": "${nextWeekDates[6]}",
+    "time": "14:00"
+  }
+]
 
 Input: "Schedule a team meeting every Tuesday at 10 AM for the next month"
 [
@@ -129,6 +180,24 @@ Input: "Plan my workout schedule"
   "type": "message",
   "content": "I can help you plan your workout schedule. Could you specify:\n1. How many days per week you want to work out?\n2. Preferred time of day?\n3. Types of workouts you're interested in?\n4. When would you like to start?"
 }
+
+Time formats I understand:
+- "3pm" or "3 PM" → "15:00"
+- "3:30pm" or "3:30 PM" → "15:30"
+- "morning" → "09:00"
+- "afternoon" → "14:00"
+- "evening" → "18:00"
+- "night" → "20:00"
+
+Date formats I understand:
+- "today" → current date
+- "tomorrow" → next day
+- "next [day]" → next occurrence of that day
+- "every day" → create multiple events
+- "every [day of week]" → create multiple events
+- "for a week" → create 7 daily events
+- "for a month" → create 4 weekly events
+- Specific dates like "July 30th" or "2025-07-30"
 
 IMPORTANT: Return ONLY the JSON without any markdown formatting or explanation.`;
 
@@ -167,12 +236,13 @@ IMPORTANT: Return ONLY the JSON without any markdown formatting or explanation.`
         }
       } catch (error) {
         console.error('Error parsing Gemini response:', error);
+        console.error('Raw response:', responseText);
         setMessages(prev => [
           ...prev,
           { role: 'user', content: message },
           { 
             role: 'assistant', 
-            content: 'I encountered an error processing your request. Could you try rephrasing it?' 
+            content: 'I encountered an error processing your request. Try being more specific, for example:\n• "Add a meeting at 2pm every day starting today for a week"\n• "Schedule a daily standup at 10am for the next 5 days"\n• "Create a workout reminder at 6pm every day this week"'
           }
         ]);
       }
