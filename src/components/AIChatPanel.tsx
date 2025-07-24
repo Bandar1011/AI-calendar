@@ -1,0 +1,264 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { CalendarRef } from '@/app/task/Calendar';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface AIChatPanelProps {
+  calendarRef: React.RefObject<CalendarRef | null>;
+}
+
+export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: 'Hi! I\'m your calendar assistant. I can help you with:\n• Creating events and tasks\n• Planning your schedule\n• Organizing your calendar\n\nTry asking me something like:\n"Plan my workout schedule for next month" or\n"Schedule a team meeting every Tuesday at 10 AM"'
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input]);
+
+  const processMessage = async (message: string) => {
+    if (!calendarRef.current) return;
+    
+    try {
+      setIsProcessing(true);
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+      // Get current date info for context
+      const now = new Date();
+      const currentDate = now.toISOString().split('T')[0];
+      const currentTime = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+
+      const prompt = `You are an advanced calendar assistant that helps users plan and schedule events. Your task is to understand the user's request and create appropriate calendar events.
+
+Current date: ${currentDate}
+Current time: ${currentTime}
+
+User request: "${message}"
+
+Instructions:
+1. Analyze the request to determine if it's about:
+   - Creating single/recurring events
+   - Planning schedules
+   - Modifying existing events
+   - Getting calendar information
+
+2. For event creation, extract:
+   - Event title/description
+   - Date(s) and time(s)
+   - Recurrence pattern (if any)
+   - Additional context
+
+3. Return a JSON array of events to create, following this format:
+[
+  {
+    "title": "descriptive title with context",
+    "date": "YYYY-MM-DD",
+    "time": "HH:mm",
+    "description": "optional detailed description"
+  }
+]
+
+4. If the request requires clarification or can't be processed as events, return:
+{
+  "type": "message",
+  "content": "your response explaining what you need or providing information"
+}
+
+Examples:
+
+Input: "Schedule a team meeting every Tuesday at 10 AM for the next month"
+[
+  {
+    "title": "Team Meeting",
+    "date": "2025-07-30",
+    "time": "10:00"
+  },
+  {
+    "title": "Team Meeting",
+    "date": "2025-08-06",
+    "time": "10:00"
+  },
+  {
+    "title": "Team Meeting",
+    "date": "2025-08-13",
+    "time": "10:00"
+  },
+  {
+    "title": "Team Meeting",
+    "date": "2025-08-20",
+    "time": "10:00"
+  }
+]
+
+Input: "Plan my workout schedule"
+{
+  "type": "message",
+  "content": "I can help you plan your workout schedule. Could you specify:\n1. How many days per week you want to work out?\n2. Preferred time of day?\n3. Types of workouts you're interested in?\n4. When would you like to start?"
+}
+
+IMPORTANT: Return ONLY the JSON without any markdown formatting or explanation.`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text();
+      
+      try {
+        const parsedResponse = JSON.parse(responseText);
+        
+        if (Array.isArray(parsedResponse)) {
+          // Handle event creation
+          for (const event of parsedResponse) {
+            const eventDate = new Date(`${event.date}T${event.time}`);
+            await calendarRef.current.handleAddTask(
+              event.description ? `${event.title} - ${event.description}` : event.title,
+              eventDate
+            );
+          }
+          
+          setMessages(prev => [
+            ...prev,
+            { role: 'user', content: message },
+            { 
+              role: 'assistant', 
+              content: `I've added ${parsedResponse.length} event${parsedResponse.length > 1 ? 's' : ''} to your calendar.`
+            }
+          ]);
+        } else if (parsedResponse.type === 'message') {
+          // Handle conversation messages
+          setMessages(prev => [
+            ...prev,
+            { role: 'user', content: message },
+            { role: 'assistant', content: parsedResponse.content }
+          ]);
+        }
+      } catch (error) {
+        console.error('Error parsing Gemini response:', error);
+        setMessages(prev => [
+          ...prev,
+          { role: 'user', content: message },
+          { 
+            role: 'assistant', 
+            content: 'I encountered an error processing your request. Could you try rephrasing it?' 
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: message },
+        { 
+          role: 'assistant', 
+          content: 'Sorry, I encountered an error. Please try again.' 
+        }
+      ]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || isProcessing) return;
+
+    const userMessage = input.trim();
+    setInput('');
+    await processMessage(userMessage);
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Messages Area */}
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${msg.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+          >
+            <div
+              className={`rounded-lg px-4 py-2 max-w-[85%] ${
+                msg.role === 'assistant'
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-blue-500/20 text-blue-300'
+              }`}
+            >
+              <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-800">
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder="Type your request... (e.g., 'Plan my workout schedule for next month')"
+            className="w-full resize-none bg-gray-800 text-white rounded-lg pl-4 pr-24 py-3 min-h-[44px] max-h-[200px] focus:outline-none focus:ring-1 focus:ring-gray-600"
+            rows={1}
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isProcessing}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md transition-colors ${
+              input.trim() && !isProcessing
+                ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                : 'bg-gray-700 text-gray-500'
+            }`}
+          >
+            {isProcessing ? (
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+} 

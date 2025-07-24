@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useUser, UserButton } from '@clerk/nextjs';
 import Calendar, { CalendarRef } from './Calendar';
-import SpeechToText from '@/components/speechtotext';
+import AIChatPanel from '@/components/AIChatPanel';
 
 export default function TaskPage() {
   const calendarRef = useRef<CalendarRef>(null);
@@ -87,12 +87,7 @@ export default function TaskPage() {
           <div className="p-4 border-b border-gray-800">
             <h2 className="text-sm font-medium text-gray-400">Calendar Assistant</h2>
           </div>
-          <div className="flex-1 overflow-auto p-4">
-            {/* Chat messages would go here */}
-          </div>
-          <div className="p-4 border-t border-gray-800">
-            <SpeechToText calendarRef={calendarRef} />
-          </div>
+          <AIChatPanel calendarRef={calendarRef} />
         </div>
       </div>
 
