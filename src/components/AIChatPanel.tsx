@@ -25,7 +25,6 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const chatSessionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,33 +46,31 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
     adjustTextareaHeight();
   }, [input]);
 
-  useEffect(() => {
-    const initChat = async () => {
-      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0' });
-      chatSessionRef.current = model.startChat({
-        systemInstruction: 'You are a smart calendar assistant. Return JSON arrays of events (title, date, time).',
-        history: [],
-      });
-    };
-    initChat();
-  }, []);
-
   const processMessage = async (message: string) => {
-    if (!calendarRef.current || !chatSessionRef.current) return;
+    if (!calendarRef.current) return;
 
     try {
       setIsProcessing(true);
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-      const result = await chatSessionRef.current.sendMessage(message);
+      const prompt = `You are a smart calendar assistant. Return only a JSON array of events based on user requests. Each event should include a title, date (YYYY-MM-DD), and time (HH:mm in 24-hour format).
+
+User request: "${message}"
+
+Example:
+[
+  { "title": "Workout", "date": "2025-07-26", "time": "17:00" }
+]`;
+
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = await response.text();
       console.log('Gemini raw response:', text);
 
-      const jsonMatch = text.match(/\[.*\]/s);
-      if (!jsonMatch) throw new Error('No JSON array found.');
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      const match = text.match(/\[.*\]/s);
+      if (!match) throw new Error('No JSON array found');
+      const parsed = JSON.parse(match[0]);
 
       if (Array.isArray(parsed)) {
         for (const event of parsed) {
@@ -87,7 +84,8 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
           { role: 'user', content: message },
           {
             role: 'assistant',
-            content: `✅ Added ${parsed.length} event(s):\n` +
+            content:
+              `✅ Added ${parsed.length} event(s):\n` +
               parsed
                 .map(
                   (e) => `• ${e.title} on ${new Date(e.date).toLocaleDateString()} at ${e.time}`
@@ -97,7 +95,7 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
         ]);
       }
     } catch (err) {
-      console.error('Gemini parsing failed:', err);
+      console.error('Gemini error:', err);
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: message },
