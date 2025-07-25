@@ -54,13 +54,28 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
       const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-      const prompt = `You are a smart calendar assistant. Return only a JSON array of events based on user requests. Each event should include a title, date (YYYY-MM-DD), and time (HH:mm in 24-hour format).
+      const currentDate = new Date();
+      const prompt = `You are a smart calendar assistant. The current date and time is ${currentDate.toISOString()}.
+
+IMPORTANT RULES:
+1. For relative dates like "tomorrow", "next Tuesday", use dates relative to the current date above
+2. Never use dates in the past
+3. If no specific date is mentioned, use the next occurrence of that day
+4. If no year is specified, use the current year
+5. Return ONLY a JSON array of events, no other text
+6. Each event must include:
+   - title: Clear, specific title
+   - date: YYYY-MM-DD format
+   - time: HH:mm in 24-hour format
 
 User request: "${message}"
 
-Example:
+Example response for "Schedule team meeting every Tuesday at 3pm":
 [
-  { "title": "Workout", "date": "2025-07-26", "time": "17:00" }
+  { "title": "Team Meeting", "date": "2025-07-30", "time": "15:00" },
+  { "title": "Team Meeting", "date": "2025-08-06", "time": "15:00" },
+  { "title": "Team Meeting", "date": "2025-08-13", "time": "15:00" },
+  { "title": "Team Meeting", "date": "2025-08-20", "time": "15:00" }
 ]`;
 
       const result = await model.generateContent(prompt);
@@ -73,8 +88,18 @@ Example:
       const parsed = JSON.parse(match[0]);
 
       if (Array.isArray(parsed)) {
-        for (const event of parsed) {
-          if (!event.title || !event.date || !event.time) continue;
+        // Validate dates before adding
+        const validEvents = parsed.filter(event => {
+          if (!event.title || !event.date || !event.time) return false;
+          const eventDate = new Date(`${event.date}T${event.time}`);
+          return eventDate > currentDate && !isNaN(eventDate.getTime());
+        });
+
+        if (validEvents.length === 0) {
+          throw new Error('No valid events found');
+        }
+
+        for (const event of validEvents) {
           const date = new Date(`${event.date}T${event.time}`);
           await calendarRef.current.handleAddTask(event.title, date);
         }
@@ -85,10 +110,10 @@ Example:
           {
             role: 'assistant',
             content:
-              `✅ Added ${parsed.length} event(s):\n` +
-              parsed
+              `✅ Added ${validEvents.length} event(s):\n` +
+              validEvents
                 .map(
-                  (e) => `• ${e.title} on ${new Date(e.date).toLocaleDateString()} at ${e.time}`
+                  (e) => `• ${e.title} on ${new Date(`${e.date}T${e.time}`).toLocaleString()}`
                 )
                 .join('\n'),
           },
@@ -102,7 +127,7 @@ Example:
         {
           role: 'assistant',
           content:
-            '⚠️ Sorry, I couldn\'t understand that. Try something like:\n"Add a meeting at 2pm every day for a week" or\n"Schedule a dentist appointment tomorrow at 3:30pm".',
+            '⚠️ Sorry, I couldn\'t process that request. Please try again with a clear date and time, like:\n"Schedule a meeting next Tuesday at 3:00 PM" or\n"Add dentist appointment tomorrow at 2:30 PM".',
         },
       ]);
     } finally {
