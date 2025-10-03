@@ -1,33 +1,34 @@
-Voice-first calendar that lets you speak tasks/events, auto-parses the intent with AI, and saves them to your account. Full-stack on Next.js, deployed on Vercel.
-link --> https://ai-calender-iota.vercel.app/task
-Features
+EN: Voice-first calendar that lets you speak tasks/events, auto-parses the intent with AI, and saves them to your account. Full-stack on Next.js, deployed on Vercel.
+JP: 音声入力で予定やタスクを登録できるカレンダーアプリです。AIが自然言語を解析し、タイトル・日時・締切・メモに自動変換して保存します。Next.jsで構築したフルスタックアプリで、Vercelにデプロイしています。
+デモはこちらーー＞https://ai-calender-iota.vercel.app/task
+Features / 機能
 
-🎙 Voice input → create events and tasks hands-free
+🎙 Voice input / 音声入力 → 話すだけで予定やタスクを追加
 
-🤖 AI parsing → turn natural language into structured events (title, date/time, deadline, notes)
+🤖 AI parsing / AI解析 → 自然な文章をイベント情報（タイトル、日時、締切、メモ）に変換
 
-🔐 User auth (Google Sign-In) → personal data per user
+🔐 User auth (Google Sign-In) / ユーザー認証（Googleログイン） → 個別アカウントでデータを管理
 
-🗂 Tasks & Events → list, search, filter; quick complete/edit
+🗂 Tasks & Events / タスク・イベント管理 → リスト、検索、フィルター、完了チェック、編集
 
-📅 Month/Week/Day views (client calendar UI)
+📅 Calendar views / カレンダー表示 → 月・週・日ごとの表示に対応
 
-☁️ Supabase + Prisma → Postgres persistence
+☁️ Supabase + Prisma → Postgresデータベースに保存
 
-🌗 Dark mode; mobile-friendly
+🌗 Dark mode / ダークモード → モバイル対応
 
-🇯🇵 Timezone-aware (defaults to Asia/Tokyo)
+🇯🇵 Timezone aware / 日本時間対応 → デフォルトは Asia/Tokyo
 
-Tech Stack
+Tech Stack / 技術スタック
 
-Frontend: Next.js (App Router) + TypeScript, Tailwind, shadcn/ui
+Frontend / フロントエンド: Next.js (App Router) + TypeScript, TailwindCSS, shadcn/ui
 
-Auth: NextAuth (Google) (or Clerk if you used it — change this line accordingly)
+Auth / 認証: NextAuth (Googleログイン)
 
-DB: Supabase Postgres + Prisma ORM
+DB / データベース: Supabase Postgres + Prisma ORM
 
-AI: Gemini API (or your actual provider — update this line) for NL → event parsing
+AI / 人工知能: Gemini API → テキストをイベント情報に変換
 
-Voice: Web Speech API / Whisper (write what you actually use)
+Voice / 音声: Web Speech API（音声認識）
 
-Deploy: Vercel
+Deploy / デプロイ: Vercel
