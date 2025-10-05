@@ -23,6 +23,7 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
   ]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sessionId, setSessionId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -46,90 +47,151 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
     adjustTextareaHeight();
   }, [input]);
 
+  useEffect(() => {
+    // Initialize or restore a sessionId for chat memory
+    try {
+      let id = localStorage.getItem('chatSessionId');
+      if (!id) {
+        const arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        id = Array.from(arr).map(x => x.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem('chatSessionId', id);
+      }
+      setSessionId(id);
+    } catch {
+      // Fallback if localStorage or crypto not available
+      setSessionId(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    }
+  }, []);
+
   const processMessage = async (message: string) => {
     if (!calendarRef.current) return;
+    if (!sessionId) return;
 
     try {
       setIsProcessing(true);
-      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      // Push user message to UI
+      setMessages((prev) => [...prev, { role: 'user', content: message }]);
 
-      const currentDate = new Date();
-      const prompt = `You are a smart calendar assistant. The current date and time is ${currentDate.toISOString()}.
+      // Stream assistant reply from server (memory-aware)
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, userText: message }),
+      });
 
-IMPORTANT RULES:
-1. For relative dates like "tomorrow", "next Tuesday", use dates relative to the current date above
-2. Never use dates in the past
-3. If no specific date is mentioned, use the next occurrence of that day
-4. If no year is specified, use the current year
-5. Return ONLY a JSON array of events, no other text
-6. Each event must include:
-   - title: Clear, specific title
-   - date: YYYY-MM-DD format
-   - time: HH:mm in 24-hour format
+      if (!res.ok || !res.body) {
+        const err = await res.text().catch(() => '');
+        throw new Error(err || `Chat HTTP ${res.status}`);
+      }
 
-User request: "${message}"
-
-Example response for "Schedule team meeting every Tuesday at 3pm":
-[
-  { "title": "Team Meeting", "date": "2025-07-30", "time": "15:00" },
-  { "title": "Team Meeting", "date": "2025-08-06", "time": "15:00" },
-  { "title": "Team Meeting", "date": "2025-08-13", "time": "15:00" },
-  { "title": "Team Meeting", "date": "2025-08-20", "time": "15:00" }
-]`;
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = await response.text();
-      console.log('Gemini raw response:', text);
-
-      const match = text.match(/\[.*\]/s);
-      if (!match) throw new Error('No JSON array found');
-      const parsed = JSON.parse(match[0]);
-
-      if (Array.isArray(parsed)) {
-        // Validate dates before adding
-        const validEvents = parsed.filter(event => {
-          if (!event.title || !event.date || !event.time) return false;
-          const eventDate = new Date(`${event.date}T${event.time}`);
-          return eventDate > currentDate && !isNaN(eventDate.getTime());
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantText = '';
+      // Add an empty assistant message to accumulate stream
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        assistantText += chunk;
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIdx = next.length - 1;
+          if (lastIdx >= 0 && next[lastIdx].role === 'assistant') {
+            next[lastIdx] = { role: 'assistant', content: next[lastIdx].content + chunk };
+          }
+          return next;
         });
+      }
 
-        if (validEvents.length === 0) {
-          throw new Error('No valid events found');
-        }
-
-        for (const event of validEvents) {
-          const date = new Date(`${event.date}T${event.time}`);
-          await calendarRef.current.handleAddTask(event.title, date);
-        }
-
+      // After assistant finishes speaking, ask planner to build 7-day schedule from history
+      const planRes = await fetch('/api/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      if (!planRes.ok) {
+        // Do not throw; we still showed the assistant message. Just append a soft warning.
         setMessages((prev) => [
           ...prev,
-          { role: 'user', content: message },
+          { role: 'assistant', content: 'Note: could not generate a weekly plan right now.' },
+        ]);
+        return;
+      }
+      const events = (await planRes.json()) as Array<{ title: string; date: string; time: string }>;
+      const now = new Date();
+      const valid = events.filter((e) => {
+        if (!e?.title || !e?.date || !e?.time) return false;
+        const dt = new Date(`${e.date}T${e.time}`);
+        return !isNaN(dt.getTime()) && dt > now;
+      });
+      for (const e of valid) {
+        const when = new Date(`${e.date}T${e.time}`);
+        await calendarRef.current.handleAddTask(e.title, when);
+      }
+      if (valid.length > 0) {
+        setMessages((prev) => [
+          ...prev,
           {
             role: 'assistant',
             content:
-              `✅ Added ${validEvents.length} event(s):\n` +
-              validEvents
-                .map(
-                  (e) => `• ${e.title} on ${new Date(`${e.date}T${e.time}`).toLocaleString()}`
-                )
+              `🗓️ Scheduled ${valid.length} item(s):\n` +
+              valid
+                .map((e) => `• ${e.title} on ${new Date(`${e.date}T${e.time}`).toLocaleString()}`)
                 .join('\n'),
           },
         ]);
       }
     } catch (err) {
-      console.error('Gemini error:', err);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'user', content: message },
-        {
-          role: 'assistant',
-          content:
-            '⚠️ Sorry, I couldn\'t process that request. Please try again with a clear date and time, like:\n"Schedule a meeting next Tuesday at 3:00 PM" or\n"Add dentist appointment tomorrow at 2:30 PM".',
-        },
-      ]);
+      console.error('Chat/Plan error:', err);
+      // Fallback: single-turn JSON planning directly on client to avoid blocking user
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+        if (!apiKey) throw new Error('Missing NEXT_PUBLIC_GEMINI_API_KEY');
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.0-flash' });
+
+        const nowIso = new Date().toISOString();
+        const prompt = `You are a scheduling assistant. Current ISO time: ${nowIso}.
+Return strictly JSON array (no markdown). Each item: {"title": string, "date": "YYYY-MM-DD", "time": "HH:mm"}.
+User request: "${message}"`;
+
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        });
+        const text = await result.response.text();
+        let data: any;
+        try { data = JSON.parse(text); } catch { throw new Error('Fallback JSON parse failed'); }
+        const now = new Date();
+        const valid = Array.isArray(data) ? data.filter((e: any) => {
+          if (!e?.title || !e?.date || !e?.time) return false;
+          const dt = new Date(`${e.date}T${e.time}`);
+          return !isNaN(dt.getTime()) && dt > now;
+        }) : [];
+        for (const e of valid) {
+          await calendarRef.current!.handleAddTask(e.title, new Date(`${e.date}T${e.time}`));
+        }
+        if (valid.length > 0) {
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: `✅ Added ${valid.length} event(s) (fallback).` },
+          ]);
+          return;
+        }
+        // No valid fallback — surface error details
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `⚠️ Unable to schedule. Details: ${(err as any)?.message ?? 'Unknown error'}` },
+        ]);
+      } catch (fallbackErr: any) {
+        console.error('Fallback scheduling failed:', fallbackErr);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `⚠️ Scheduling failed. ${fallbackErr?.message || 'Unknown error'}` },
+        ]);
+      }
     } finally {
       setIsProcessing(false);
     }

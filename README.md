@@ -5,6 +5,24 @@ JP: 音声入力で予定やタスクを登録できるカレンダーアプリ�
 デモはこちらーー＞https://ai-calender-iota.vercel.app/task
 Features / 機能
 
+## Chat API (Streaming with memory)
+
+環境変数:
+
+```
+GEMINI_API_KEY=your_api_key
+# 任意: モデルを変更
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+エンドポイント:
+
+- `POST /api/chat` — Body: `{ sessionId: string, userText: string }`
+  - ストリームでテキストを返す (`text/plain`)
+- `DELETE /api/chat` — Body: `{ sessionId: string }` で該当セッションの会話メモリをクリア
+
+メモリ保持は `src/lib/chatMemory.ts` の Map に保存されます（プロセス内のみ）。
+
 🎙 Voice input / 音声入力 → 話すだけで予定やタスクを追加
 
 🤖 AI parsing / AI解析 → 自然な文章をイベント情報（タイトル、日時、締切、メモ）に変換
