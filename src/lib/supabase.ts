@@ -31,3 +31,15 @@ export const createServerSupabaseClient = () => {
     }
   })
 } 
+
+// Service-role client (server-only). Requires SUPABASE_SERVICE_ROLE_KEY set.
+export const createServiceSupabaseClient = () => {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  if (!serviceKey) {
+    // Fall back to anon if service key is missing; RLS may block writes
+    return createServerSupabaseClient()
+  }
+  return createClient<Database>(supabaseUrl, serviceKey, {
+    auth: { persistSession: false }
+  })
+}

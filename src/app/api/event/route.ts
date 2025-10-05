@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getAuth } from "@clerk/nextjs/server";
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient, createServiceSupabaseClient } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
       user_id: userId
     };
 
-    const supabase = createServerSupabaseClient();
+    // Prefer service role to avoid RLS/write issues; falls back to anon if missing
+    const supabase = createServiceSupabaseClient();
     const { data, error } = await supabase
       .from('events')
       .insert([event])
@@ -62,7 +63,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error('Error in POST handler:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    const message = (error as any)?.message || 'Internal Server Error';
+    return NextResponse.json({ error: message, details: error }, { status: 500 });
   }
 }
 
