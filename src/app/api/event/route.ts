@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getAuth } from "@clerk/nextjs/server";
-import { supabaseClient } from '@/lib/supabaseClient';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: events, error } = await supabaseClient
+    const supabase = createServerSupabaseClient();
+    const { data: events, error } = await supabase
       .from('events')
       .select('*')
       .eq('user_id', userId)
@@ -46,7 +47,8 @@ export async function POST(request: NextRequest) {
       user_id: userId
     };
 
-    const { data, error } = await supabaseClient
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
       .from('events')
       .insert([event])
       .select()
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating event:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: error.message, details: error }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });
@@ -74,7 +76,8 @@ export async function DELETE(request: NextRequest) {
 
     const { id } = await request.json();
 
-    const { error } = await supabaseClient
+    const supabase = createServerSupabaseClient();
+    const { error } = await supabase
       .from('events')
       .delete()
       .eq('id', id)

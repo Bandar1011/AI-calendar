@@ -128,7 +128,27 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
       });
       for (const e of valid) {
         const when = new Date(`${e.date}T${e.time}`);
-        await calendarRef.current.handleAddTask(e.title, when);
+        try {
+          await calendarRef.current.handleAddTask(e.title, when);
+        } catch (addErr: any) {
+          // Fallback: call server API to create event
+          const end = new Date(when);
+          end.setHours(end.getHours() + 1);
+          const resCreate = await fetch('/api/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: e.title,
+              description: 'Added by AI planner',
+              start_time: when.toISOString(),
+              end_time: end.toISOString(),
+            }),
+          });
+          if (!resCreate.ok) {
+            const errText = await resCreate.text().catch(() => '');
+            throw new Error(`Create event failed: HTTP ${resCreate.status} ${errText}`);
+          }
+        }
       }
       if (valid.length > 0) {
         setMessages((prev) => [
@@ -171,7 +191,27 @@ User request: "${message}"`;
           return !isNaN(dt.getTime()) && dt > now;
         }) : [];
         for (const e of valid) {
-          await calendarRef.current!.handleAddTask(e.title, new Date(`${e.date}T${e.time}`));
+          const when = new Date(`${e.date}T${e.time}`);
+          try {
+            await calendarRef.current!.handleAddTask(e.title, when);
+          } catch (addErr: any) {
+            const end = new Date(when);
+            end.setHours(end.getHours() + 1);
+            const resCreate = await fetch('/api/event', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: e.title,
+                description: 'Added by AI planner',
+                start_time: when.toISOString(),
+                end_time: end.toISOString(),
+              }),
+            });
+            if (!resCreate.ok) {
+              const errText = await resCreate.text().catch(() => '');
+              throw new Error(`Create event failed: HTTP ${resCreate.status} ${errText}`);
+            }
+          }
         }
         if (valid.length > 0) {
           setMessages((prev) => [
