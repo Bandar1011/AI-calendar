@@ -1,12 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from './database.types'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+const rawAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!rawUrl || !rawAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
+
+let supabaseUrl: string
+try {
+  supabaseUrl = new URL(rawUrl).toString()
+} catch {
+  throw new Error('Invalid NEXT_PUBLIC_SUPABASE_URL')
+}
+
+const supabaseAnonKey = rawAnonKey
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -16,13 +25,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 
 // For server-side operations
 export const createServerSupabaseClient = () => {
-  return createClient<Database>(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      auth: {
-        persistSession: false,
-      }
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
     }
-  )
+  })
 } 
