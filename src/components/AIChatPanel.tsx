@@ -126,41 +126,34 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
         const dt = new Date(`${e.date}T${e.time}`);
         return !isNaN(dt.getTime()) && dt > now;
       });
+      let addedCount = 0;
+      const failedAdds: string[] = [];
       for (const e of valid) {
         const when = new Date(`${e.date}T${e.time}`);
         try {
           await calendarRef.current.handleAddTask(e.title, when);
+          addedCount += 1;
         } catch (addErr: any) {
-          // Fallback: call server API to create event
-          const end = new Date(when);
-          end.setHours(end.getHours() + 1);
-          const resCreate = await fetch('/api/event', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: e.title,
-              description: 'Added by AI planner',
-              start_time: when.toISOString(),
-              end_time: end.toISOString(),
-            }),
-          });
-          if (!resCreate.ok) {
-            const errText = await resCreate.text().catch(() => '');
-            throw new Error(`Create event failed: HTTP ${resCreate.status} ${errText}`);
-          }
+          failedAdds.push(`${e.title} (${addErr?.message || 'add failed'})`);
         }
       }
-      if (valid.length > 0) {
+      if (addedCount > 0) {
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
             content:
-              `🗓️ Scheduled ${valid.length} item(s):\n` +
-              valid
+              `🗓️ Scheduled ${addedCount} item(s):\n` +
+              valid.slice(0, addedCount)
                 .map((e) => `• ${e.title} on ${new Date(`${e.date}T${e.time}`).toLocaleString()}`)
                 .join('\n'),
           },
+        ]);
+      }
+      if (failedAdds.length > 0) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `Note: ${failedAdds.length} add(s) failed. Are you signed in? ${failedAdds.join('; ')}` },
         ]);
       }
     } catch (err) {
@@ -190,34 +183,28 @@ User request: "${message}"`;
           const dt = new Date(`${e.date}T${e.time}`);
           return !isNaN(dt.getTime()) && dt > now;
         }) : [];
+        let added = 0;
+        const failed: string[] = [];
         for (const e of valid) {
           const when = new Date(`${e.date}T${e.time}`);
           try {
             await calendarRef.current!.handleAddTask(e.title, when);
+            added += 1;
           } catch (addErr: any) {
-            const end = new Date(when);
-            end.setHours(end.getHours() + 1);
-            const resCreate = await fetch('/api/event', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: e.title,
-                description: 'Added by AI planner',
-                start_time: when.toISOString(),
-                end_time: end.toISOString(),
-              }),
-            });
-            if (!resCreate.ok) {
-              const errText = await resCreate.text().catch(() => '');
-              throw new Error(`Create event failed: HTTP ${resCreate.status} ${errText}`);
-            }
+            failed.push(`${e.title} (${addErr?.message || 'add failed'})`);
           }
         }
-        if (valid.length > 0) {
+        if (added > 0) {
           setMessages((prev) => [
             ...prev,
-            { role: 'assistant', content: `✅ Added ${valid.length} event(s) (fallback).` },
+            { role: 'assistant', content: `✅ Added ${added} event(s).` },
           ]);
+          if (failed.length > 0) {
+            setMessages((prev) => [
+              ...prev,
+              { role: 'assistant', content: `Some adds failed. Are you signed in? ${failed.join('; ')}` },
+            ]);
+          }
           return;
         }
         // No valid fallback — surface error details
