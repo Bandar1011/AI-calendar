@@ -120,8 +120,11 @@ for delete using (auth.uid() = user_id);
 
 開発 (Dev)
 npm i
+
 cp .env.example .env.local
+
 npm run dev
+
 # http://localhost:3000
 
 
