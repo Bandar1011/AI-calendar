@@ -13,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" suppressHydrationWarning>
         <body className="min-h-screen bg-gray-50">
           {children}
         </body>

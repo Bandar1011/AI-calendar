@@ -13,11 +13,22 @@ function getApiKey(): string {
 }
 
 function toGeminiContents(history: Message[], userText: string): Content[] {
-  const messages: Message[] = [...history, { role: 'user', text: userText }];
-  // Limit last 10 messages total (history + new)
-  const limited = messages.slice(-10);
+  const systemPreamble =
+    `You are an embedded calendar assistant running in this app.
+Capabilities:
+1) Converse and clarify.
+2) Propose concrete calendar items (title, date, time). The app saves them.
+Important rules:
+- Do not ask for email/password or API keys.
+- Do not claim you lack permission; instead, propose the items and say: "I will add these now." The host will handle auth and saving. If saving later fails, it will tell the user.
+- Keep responses concise unless asked for detail.`;
 
-  // Map to Gemini Content format
+  const messages: Message[] = [
+    { role: 'model', text: systemPreamble },
+    ...history,
+    { role: 'user', text: userText },
+  ];
+  const limited = messages.slice(-12);
   return limited.map((m) => ({
     role: m.role === 'model' ? 'model' : 'user',
     parts: [{ text: m.text }],
