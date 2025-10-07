@@ -143,7 +143,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="bg-[#0b0f17] text-white">
+    <div className="bg-gradient-to-br from-[#0b0e1a] via-[#121735] to-[#1a1233] text-white">
       <div className="flex items-center justify-between mb-6">
         <button onClick={handlePrevMonth} className="px-4 py-2 rounded-lg border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors">Prev</button>
         <h1 className="text-2xl font-bold tracking-wide">
@@ -154,7 +154,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left day detail panel */}
-        <div className="lg:col-span-1 rounded-xl border border-cyan-500/20 p-4 bg-white/[0.02]">
+        <div className="lg:col-span-1 rounded-xl border border-white/10 p-4 bg-white/[0.03]">
           <div className="text-sm text-gray-400">Selected</div>
           <div className="mt-1 text-xl font-semibold text-cyan-300">
             {selectedDate?.toLocaleDateString()}
@@ -174,10 +174,10 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
         </div>
 
         {/* Month grid */}
-        <div className="lg:col-span-3 rounded-xl border border-cyan-500/20 p-6 bg-[#101826]">
+        <div className="lg:col-span-3 rounded-xl border border-white/10 p-6 bg-white/[0.04]">
           <div className="grid grid-cols-7 gap-2 text-center mb-2">
             {days.map(day => (
-              <div key={day} className="font-medium text-cyan-200/70 text-sm py-1">
+              <div key={day} className="font-medium text-white/70 text-sm py-1">
                 {day}
               </div>
             ))}
@@ -200,12 +200,12 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
                     <button
                       onClick={() => setSelectedDate(cellDate)}
                       className={`w-full h-full rounded-lg flex items-center justify-center transition-colors relative text-sm ${
-                        isSel ? 'bg-cyan-600/30 text-white ring-1 ring-cyan-400' : isToday ? 'bg-cyan-500/10 text-white' : 'hover:bg-white/5 text-gray-300'
+                        isSel ? 'bg-violet-600/30 text-white ring-1 ring-violet-400' : isToday ? 'bg-fuchsia-500/10 text-white' : 'hover:bg-white/5 text-gray-300'
                       }`}
                     >
                       {date}
                       {dayTasks.length > 0 && (
-                        <span className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-cyan-400 rounded-full" />
+                        <span className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-fuchsia-400 rounded-full" />
                       )}
                     </button>
                   </div>
