@@ -1,4 +1,5 @@
-ai-calender-iota.vercel.app
+[ai-calender-iota.vercel.app](https://ai-calender-iota.vercel.app/task)
+
 AI Calendar / AIカレンダー
 
 EN: Voice/text to calendar. Type or speak tasks/events; the app uses Gemini to parse and saves them to Supabase under your account (auth via Clerk).
