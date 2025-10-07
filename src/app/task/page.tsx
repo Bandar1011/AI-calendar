@@ -51,9 +51,9 @@ export default function TaskPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a]">
+    <div className="min-h-screen bg-gradient-to-br from-[#0b0e1a] via-[#121735] to-[#1a1233]">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-[#1a1a1a] px-4 py-3 sticky top-0 z-10">
+      <header className="border-b border-white/10 bg-white/[0.03] px-4 py-3 sticky top-0 z-10">
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-semibold text-white">Task Calendar</h1>
           <UserButton afterSignOutUrl="/" />
@@ -73,7 +73,7 @@ export default function TaskPage() {
         <div
           ref={dragHandleRef}
           className={`w-1 cursor-col-resize hover:w-2 group relative ${
-            isDragging ? 'bg-blue-500/50 w-2' : 'bg-gray-800'
+            isDragging ? 'bg-fuchsia-500/50 w-2' : 'bg-white/10'
           } transition-[width,background-color] duration-150`}
           onMouseDown={handleMouseDown}
         >
@@ -84,11 +84,11 @@ export default function TaskPage() {
 
         {/* Chat Section */}
         <div 
-          className="border-l border-gray-800 bg-[#1a1a1a] flex flex-col"
+          className="border-l border-white/10 bg-white/[0.03] flex flex-col"
           style={{ width: `${chatWidth}px`, minWidth: '300px', maxWidth: '800px' }}
         >
           <div className="p-4 border-b border-gray-800">
-            <h2 className="text-sm font-medium text-gray-400">Calendar Assistant</h2>
+            <h2 className="text-sm font-medium text-white/70">Calendar Assistant</h2>
           </div>
           <AIChatPanel calendarRef={calendarRef} />
         </div>
