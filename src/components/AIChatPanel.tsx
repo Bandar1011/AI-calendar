@@ -80,9 +80,13 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
         body: JSON.stringify({ sessionId, userText: message }),
       });
 
-      if (!res.ok || !res.body) {
-        const err = await res.text().catch(() => '');
-        throw new Error(err || `Chat HTTP ${res.status}`);
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !res.body || /text\/html/i.test(contentType)) {
+        const errText = await res.text().catch(() => '');
+        const brief = errText && /<html|<!DOCTYPE/i.test(errText)
+          ? 'Server returned an HTML error page.'
+          : (errText || `Chat HTTP ${res.status}`);
+        throw new Error(brief);
       }
 
       const reader = res.body.getReader();
@@ -105,6 +109,60 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
         });
       }
 
+      // Quick path: if the user asked for a single explicit event with a concrete date/time,
+      // extract exactly one event and add it, skipping the weekly planner.
+      const isDirectEventRequest = (() => {
+        const m = message.toLowerCase();
+        const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+        const hasMonth = monthNames.some((mn) => m.includes(mn));
+        const hasDateNumeric = /\b\d{1,2}[\/-]\d{1,2}([\/-]\d{2,4})?\b/.test(m) || /\b\d{1,2}(st|nd|rd|th)\b/.test(m);
+        const hasTime = /\b\d{1,2}(:\d{2})?\s?(am|pm)\b/.test(m) || /\b\d{1,2}\s?(am|pm)\b/.test(m) || /\b\d{1,2}:\d{2}\b/.test(m);
+        return (m.includes(' on ') || hasMonth || hasDateNumeric) && hasTime;
+      })();
+
+      if (isDirectEventRequest) {
+        try {
+          const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+          if (!apiKey) throw new Error('Missing NEXT_PUBLIC_GEMINI_API_KEY');
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.0-flash' });
+          const nowIso = new Date().toISOString();
+          const prompt = `Extract exactly ONE concrete event from the user's request.
+Return strictly JSON (no markdown). Schema:
+{
+  "title": string,
+  "date": "YYYY-MM-DD",    // absolute calendar date required
+  "time": "HH:mm",         // start time 24h
+  "endTime": "HH:mm"       // optional, if user gave an end time or duration
+}
+Rules:
+- Use the explicit date/time mentioned by the user (e.g., "December 2nd 1-2pm").
+- If the request lacks a concrete date, return {}.
+- Do not invent multiple events.
+Current time: ${nowIso}
+User: ${message}`;
+          const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          });
+          const text = await result.response.text();
+          let one: any = {};
+          try { one = JSON.parse(text || '{}'); } catch {}
+          if (one?.date && one?.time && one?.title) {
+            const when = new Date(`${one.date}T${one.time}`);
+            await calendarRef.current.handleAddTask(one.title, when);
+            setMessages((prev) => [
+              ...prev,
+              { role: 'assistant', content: `✅ Added 1 event: ${one.title} on ${when.toLocaleString()}.` },
+            ]);
+            return; // Skip weekly planner
+          }
+        } catch (directErr: any) {
+          // Fall through to weekly planner if direct extraction fails
+          console.warn('Direct single-event extraction failed:', directErr?.message || directErr);
+        }
+      }
+
       // After assistant finishes speaking, ask planner to build 7-day schedule from history
       const planRes = await fetch('/api/plan', {
         method: 'POST',
@@ -112,10 +170,12 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
         body: JSON.stringify({ sessionId }),
       });
       if (!planRes.ok) {
-        // Do not throw; we still showed the assistant message. Just append a soft warning.
+        const text = await planRes.text().catch(() => '');
+        // Avoid dumping HTML into chat; show a concise error instead
+        const brief = text && /<html|<!DOCTYPE/i.test(text) ? 'Server returned an HTML error page.' : (text || `HTTP ${planRes.status}`);
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: 'Note: could not generate a weekly plan right now.' },
+          { role: 'assistant', content: `Note: could not generate a weekly plan. ${brief}` },
         ]);
         return;
       }
@@ -153,7 +213,7 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
       if (failedAdds.length > 0) {
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: `Note: ${failedAdds.length} add(s) failed. Are you signed in? ${failedAdds.join('; ')}` },
+          { role: 'assistant', content: `Note: ${failedAdds.length} add(s) failed. ${failedAdds.some(m => /Unauthorized/i.test(m)) ? 'Please sign in and try again.' : ''} ${failedAdds.join('; ')}` },
         ]);
       }
     } catch (err) {
@@ -208,9 +268,13 @@ User request: "${message}"`;
           return;
         }
         // No valid fallback — surface error details
+        const details = (() => {
+          const raw = (err as any)?.message ?? 'Unknown error';
+          return /<html|<!DOCTYPE/i.test(String(raw)) ? 'Server error (HTML response).' : String(raw);
+        })();
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: `⚠️ Unable to schedule. Details: ${(err as any)?.message ?? 'Unknown error'}` },
+          { role: 'assistant', content: `⚠️ Unable to schedule. Details: ${details}` },
         ]);
       } catch (fallbackErr: any) {
         console.error('Fallback scheduling failed:', fallbackErr);

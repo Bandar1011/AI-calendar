@@ -21,7 +21,8 @@ Conversation summary below (user goals, constraints, preferences):
 ${formatted}
 
 Task:
-- Produce a 7-day plan starting from the current date, with concrete events that fit the user's routine and constraints (work hours, commute, sleep, workout, social time, etc.).
+- If the latest user request specifies an explicit date or time window (e.g., "on Dec 2 2pm-4pm", "first week of December"), plan strictly within that window.
+- Otherwise, produce a 7-day plan starting from the current date.
 - Prefer evening times if the user is busy during the day and arrives home at 18:00.
 - Ensure events are all in the future.
 - Keep reasonable durations (default 60 minutes unless stated otherwise).

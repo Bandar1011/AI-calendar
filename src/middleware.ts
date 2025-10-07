@@ -1,19 +1,33 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-// Define public routes that don't require authentication
-const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);
+// Define public routes
+const isPublicPageRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)'
+]);
+const isPublicApiRoute = createRouteMatcher([
+  '/api/chat(.*)',
+  '/api/plan(.*)',
+  '/api/event(.*)'
+]);
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
   const { pathname } = req.nextUrl;
 
-  // If user is signed in and trying to access public routes (except root), redirect to calendar
-  if (userId && isPublicRoute(req) && pathname !== '/') {
+  // Never redirect API calls; they should return JSON
+  if (isPublicApiRoute(req)) {
+    return;
+  }
+
+  // If user is signed in and trying to access public page routes (except root), redirect to calendar
+  if (userId && isPublicPageRoute(req) && pathname !== '/') {
     return Response.redirect(new URL('/task', req.url));
   }
 
-  // If it's not a public route, protect it
-  if (!isPublicRoute(req)) {
+  // Protect non-public page routes
+  if (!isPublicPageRoute(req)) {
     await auth.protect();
   }
 });

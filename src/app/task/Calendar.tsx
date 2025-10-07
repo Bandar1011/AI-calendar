@@ -34,36 +34,25 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   };
 
   const toLocalDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+    // Incoming timestamps are ISO strings (UTC); new Date(iso) yields the
+    // correct local-time representation. Do NOT manually add timezone offset
+    // or it will shift the date incorrectly.
+    return new Date(dateStr);
   };
 
   const fetchTasks = useCallback(async () => {
     if (!user) return;
 
     try {
-      // Get the start of the year in local timezone
-      const startDate = new Date(year, 0, 1);
-      // Get the end of the year in local timezone
-      const endDate = new Date(year, 11, 31, 23, 59, 59, 999);
-
-      const { data: events, error } = await supabaseClient
-        .from('events')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('start_time', startDate.toISOString())
-        .lte('start_time', endDate.toISOString())
-        .order('start_time', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching events:', error.message);
+      const res = await fetch('/api/event', { method: 'GET' });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('Error fetching events via API:', text || res.status);
         return;
       }
-
-      if (events) {
-        console.log('Fetched events:', events);
-        setTasks(events);
-      }
+      const events = await res.json();
+      console.log('Fetched events (API):', events);
+      setTasks(events);
     } catch (error) {
       console.error('Error in fetchTasks:', error);
     }
@@ -79,34 +68,25 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
     if (!user) throw new Error('User not authenticated');
 
     try {
-      console.log('Adding task:', { description, date });
-      
-      // Create end time 1 hour after start time
+      console.log('Adding task via API:', { description, date });
       const endDate = new Date(date);
       endDate.setHours(endDate.getHours() + 1);
 
-      const event = {
-        title: description,
-        start_time: date.toISOString(),
-        end_time: endDate.toISOString(),
-        user_id: user.id
-      };
-
-      console.log('Inserting event:', event);
-
-      const { data, error } = await supabaseClient
-        .from('events')
-        .insert([event])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding task:', error);
-        throw error;
+      const res = await fetch('/api/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: description,
+          start_time: date.toISOString(),
+          end_time: endDate.toISOString(),
+          description: ''
+        })
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Failed to create event (${res.status})`);
       }
-
-      console.log('Task added successfully:', data);
-      await fetchTasks(); // Refresh the tasks list
+      await fetchTasks();
       return;
     } catch (error) {
       console.error('Error in handleAddTask:', error);
@@ -118,17 +98,16 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
     if (!user) return;
 
     try {
-      const { error } = await supabaseClient
-        .from('events')
-        .delete()
-        .eq('id', taskId)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error deleting task:', error);
+      const res = await fetch('/api/event', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId })
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('Error deleting task via API:', text || res.status);
         return;
       }
-
       await fetchTasks();
     } catch (error) {
       console.error('Error in handleDeleteTask:', error);
