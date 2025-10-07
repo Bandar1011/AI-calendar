@@ -1,54 +1,143 @@
+ai-calender-iota.vercel.app
+AI Calendar / AIカレンダー
 
-EN: Voice-first calendar that lets you speak to it
-sks/events, auto-parses the intent with AI, and saves them to your account. Full-stack on Next.js, deployed on Vercel.
-JP: 音声入力で予定やタスクを登録できるカレンダーアプリです。AIが自然言語を解析し、タイトル・日時・締切・メモに自動変換して保存します。Next.jsで構築したフルスタックアプリで、Vercelにデプロイしています。
-デモはこちらーー＞https://ai-calender-iota.vercel.app/task
+EN: Voice/text to calendar. Type or speak tasks/events; the app uses Gemini to parse and saves them to Supabase under your account (auth via Clerk).
+JP: 音声・テキストで予定を追加。内容を Gemini で解析し、Clerk 認証のユーザーごとに Supabase に保存します。
+
 Features / 機能
 
-## Chat API (Streaming with memory)
+EN
 
-環境変数:
+Voice input (Web Speech API) and text commands
 
-```
-GEMINI_API_KEY=your_api_key
-# 任意: モデルを変更
-GEMINI_MODEL=gemini-2.0-flash
-```
+AI parsing → title, start/end, deadline, notes
 
-エンドポイント:
+Per-user tasks/events (create/edit/complete/list)
 
-- `POST /api/chat` — Body: `{ sessionId: string, userText: string }`
-  - ストリームでテキストを返す (`text/plain`)
-- `DELETE /api/chat` — Body: `{ sessionId: string }` で該当セッションの会話メモリをクリア
+Calendar views (month/week/day)
 
-メモリ保持は `src/lib/chatMemory.ts` の Map に保存されます（プロセス内のみ）。
+Server-side LLM calls (no keys in client)
 
-🎙 Voice input / 音声入力 → 話すだけで予定やタスクを追加
+JP
 
-🤖 AI parsing / AI解析 → 自然な文章をイベント情報（タイトル、日時、締切、メモ）に変換
+音声入力（Web Speech API）／テキスト指示
 
-🔐 User auth (Google Sign-In) / ユーザー認証（Googleログイン） → 個別アカウントでデータを管理
+AI 解析 → タイトル・開始/終了・期限・メモ
 
-🗂 Tasks & Events / タスク・イベント管理 → リスト、検索、フィルター、完了チェック、編集
+ユーザー単位のタスク/イベント管理（作成・編集・完了・一覧）
 
-📅 Calendar views / カレンダー表示 → 月・週・日ごとの表示に対応
+カレンダー表示（月/週/日）
 
-☁️ Supabase + Prisma → Postgresデータベースに保存
-
-🌗 Dark mode / ダークモード → モバイル対応
-
-🇯🇵 Timezone aware / 日本時間対応 → デフォルトは Asia/Tokyo
+LLM 呼び出しはサーバー側（クライアントに鍵を露出しない）
 
 Tech Stack / 技術スタック
 
-Frontend / フロントエンド: Next.js (App Router) + TypeScript, TailwindCSS, shadcn/ui
+EN: Next.js (App Router), TypeScript, Tailwind, shadcn/ui, Clerk (auth), Supabase Postgres + Prisma, Gemini
 
-Auth / 認証: NextAuth (Googleログイン)
+JP: Next.js（App Router）, TypeScript, Tailwind, shadcn/ui, Clerk（認証）, Supabase Postgres + Prisma, Gemini
 
-DB / データベース: Supabase Postgres + Prisma ORM
+Architecture / アーキテクチャ
 
-AI / 人工知能: Gemini API → テキストをイベント情報に変換
+EN:
+UI → /api/chat (server) → Gemini (normalize) → validate → DB write (Supabase via Prisma).
+Memory for chat is currently in-process (Map): ephemeral per instance.
 
-Voice / 音声: Web Speech API（音声認識）
+JP:
+UI → /api/chat（サーバー）→ Gemini（正規化）→ 検証 → DB 書き込み（Prisma 経由で Supabase）。
+チャットのメモリは現状プロセス内（Map）＝インスタンス単位で揮発。
 
-Deploy / デプロイ: Vercel
+API
+
+EN
+
+POST /api/chat → { sessionId, userText } → streams text back
+
+DELETE /api/chat → { sessionId } → clears memory
+
+(Roadmap) POST /api/event/bulk → insert many events with per-item results
+
+JP
+
+POST /api/chat → { sessionId, userText } → テキストをストリーム返却
+
+DELETE /api/chat → { sessionId } → メモリ消去
+
+※将来：POST /api/event/bulk → 複数イベントを一括挿入（個別結果付き）
+
+Environment / 環境変数
+# LLM
+GEMINI_API_KEY=...
+
+# Clerk (Next.js)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+CLERK_SECRET_KEY=...
+
+# Database (Supabase Postgres via Prisma)
+DATABASE_URL="postgresql://USER:PASS@HOST:PORT/db"
+# (If you also use Supabase client in the browser, add:)
+# NEXT_PUBLIC_SUPABASE_URL=...
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+
+
+EN: Keep all secrets server-side. Do not expose GEMINI_API_KEY in the client.
+
+JP: 秘密鍵は必ずサーバー側に保持。GEMINI_API_KEY をクライアントへ出さないこと。
+
+Getting Started / 使い方
+
+EN
+
+npm i
+cp .env.example .env.local   # or create .env.local with the vars above
+npm run dev
+# open http://localhost:3000
+
+
+JP
+
+npm i
+cp .env.example .env.local   # 上記の環境変数を設定
+npm run dev
+# http://localhost:3000 を開く
+
+Data & Security / データとセキュリティ
+
+EN
+
+Auth: Clerk sessions verified on server routes.
+
+RLS (if using Supabase client): enable Row-Level Security; scope by user_id.
+
+No secrets in client: LLM & DB writes happen in route handlers (/api/*).
+
+Memory: in-process Map → use Redis/Upstash or a Supabase table with TTL for durability.
+
+JP
+
+認証: Clerk のセッションをサーバールートで検証。
+
+RLS（Supabase クライアント使用時）: 行レベルセキュリティを有効化し user_id で制限。
+
+クライアントに秘密鍵を置かない: LLM/DB 書き込みは サーバーの API で実行。
+
+メモリ: 現状はプロセス内 Map → 永続化には Redis/Upstash か TTL 付き Supabase テーブルへ。
+
+Example RLS (generic) / RLS 例（汎用）
+
+alter table events enable row level security;
+
+create policy "insert own" on events
+for insert with check (auth.uid() = user_id);
+
+create policy "select own" on events
+for select using (auth.uid() = user_id);
+
+create policy "update own" on events
+for update using (auth.uid() = user_id);
+
+create policy "delete own" on events
+for delete using (auth.uid() = user_id);
+
+
+Note / 注意: If you authenticate with Clerk and don’t use Supabase Auth JWT, enforce user_id checks in your server handlers (service key) instead of relying on auth.uid() from the client.
+Supabase Auth を使わず Clerk で認証する場合は、クライアント任せにせず サーバー側のハンドラで user_id を検証してください。
