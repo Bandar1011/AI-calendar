@@ -1,5 +1,5 @@
 
-EN: Voice-first calendar that lets you speak ta<img width="1470" height="797" alt="Screenshot 0007-10-04 at 4 31 00" src="https://github.com/user-attachments/assets/74217491-691c-477f-bc1f-022b909e61c3" />
+EN: Voice-first calendar that lets you speak to it
 sks/events, auto-parses the intent with AI, and saves them to your account. Full-stack on Next.js, deployed on Vercel.
 JP: 音声入力で予定やタスクを登録できるカレンダーアプリです。AIが自然言語を解析し、タイトル・日時・締切・メモに自動変換して保存します。Next.jsで構築したフルスタックアプリで、Vercelにデプロイしています。
 デモはこちらーー＞https://ai-calender-iota.vercel.app/task
