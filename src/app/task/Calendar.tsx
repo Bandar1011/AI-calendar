@@ -18,9 +18,10 @@ interface Task {
 }
 
 const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth());
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { user } = useUser();
 
@@ -56,7 +57,7 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
     } catch (error) {
       console.error('Error in fetchTasks:', error);
     }
-  }, [user, year]);
+  }, [user, viewYear, viewMonth]);
 
   useEffect(() => {
     if (user) {
@@ -118,16 +119,22 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
     handleAddTask
   }));
 
-  const handlePrevYear = () => {
-    setYear(prevYear => prevYear - 1);
+  const handlePrevMonth = () => {
+    setViewMonth((m) => {
+      if (m === 0) { setViewYear((y) => y - 1); return 11; }
+      return m - 1;
+    });
   };
 
-  const handleNextYear = () => {
-    setYear(prevYear => prevYear + 1);
+  const handleNextMonth = () => {
+    setViewMonth((m) => {
+      if (m === 11) { setViewYear((y) => y + 1); return 0; }
+      return m + 1;
+    });
   };
 
-  const handleDayClick = (day: number, monthIndex: number) => {
-    setSelectedDate(new Date(year, monthIndex, day));
+  const handleDayClick = (day: number) => {
+    setSelectedDate(new Date(viewYear, viewMonth, day));
     setIsModalOpen(true);
   };
 
@@ -136,80 +143,77 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="bg-[#1a1a1a] text-white">
-      <div className="flex justify-between items-center mb-8">
-        <button onClick={handlePrevYear} className="px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
-          Previous Year
-        </button>
-        <h1 className="text-2xl font-bold">{year}</h1>
-        <button onClick={handleNextYear} className="px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
-          Next Year
-        </button>
+    <div className="bg-[#0b0f17] text-white">
+      <div className="flex items-center justify-between mb-6">
+        <button onClick={handlePrevMonth} className="px-4 py-2 rounded-lg border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors">Prev</button>
+        <h1 className="text-2xl font-bold tracking-wide">
+          <span className="text-cyan-300">{months[viewMonth]}</span> {viewYear}
+        </h1>
+        <button onClick={handleNextMonth} className="px-4 py-2 rounded-lg border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors">Next</button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {months.map((month, monthIndex) => {
-          const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-          const firstDayOfMonth = new Date(year, monthIndex, 1).getDay();
-          const monthDates = [];
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Left day detail panel */}
+        <div className="lg:col-span-1 rounded-xl border border-cyan-500/20 p-4 bg-white/[0.02]">
+          <div className="text-sm text-gray-400">Selected</div>
+          <div className="mt-1 text-xl font-semibold text-cyan-300">
+            {selectedDate?.toLocaleDateString()}
+          </div>
+          <div className="mt-4 space-y-2 max-h-[40vh] overflow-auto pr-1">
+            {tasks.filter(t => selectedDate && isSameDay(toLocalDate(t.start_time), selectedDate)).length === 0 && (
+              <div className="text-gray-500 text-sm">No events.</div>
+            )}
+            {tasks.filter(t => selectedDate && isSameDay(toLocalDate(t.start_time), selectedDate)).map(t => (
+              <div key={t.id} className="rounded-lg border border-cyan-500/10 bg-[#101826] p-3">
+                <div className="font-medium text-white/90">{t.title}</div>
+                <div className="text-xs text-gray-400 mt-1">{new Date(t.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(t.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                <button onClick={() => handleDeleteTask(t.id)} className="mt-2 text-xs text-red-400 hover:text-red-300">Delete</button>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          for (let i = 0; i < firstDayOfMonth; i++) {
-            monthDates.push(null);
-          }
-
-          for (let day = 1; day <= daysInMonth; day++) {
-            monthDates.push(day);
-          }
-
-          return (
-            <div key={monthIndex} className="border border-gray-800 rounded-lg p-6 bg-[#242424]">
-              <h2 className="font-bold text-center mb-4 text-gray-400 text-lg">{month}</h2>
-              <div className="grid grid-cols-7 gap-2 text-center mb-2">
-                {days.map(day => (
-                  <div key={day} className="font-medium text-gray-500 text-sm py-1">
-                    {day}
+        {/* Month grid */}
+        <div className="lg:col-span-3 rounded-xl border border-cyan-500/20 p-6 bg-[#101826]">
+          <div className="grid grid-cols-7 gap-2 text-center mb-2">
+            {days.map(day => (
+              <div key={day} className="font-medium text-cyan-200/70 text-sm py-1">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2 text-center">
+            {(() => {
+              const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+              const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+              const monthDates: (number | null)[] = [];
+              for (let i = 0; i < firstDayOfMonth; i++) monthDates.push(null);
+              for (let d = 1; d <= daysInMonth; d++) monthDates.push(d);
+              return monthDates.map((date, idx) => {
+                if (!date) return <div key={`empty-${idx}`} className="aspect-square" />;
+                const cellDate = new Date(viewYear, viewMonth, date);
+                const isSel = selectedDate && isSameDay(selectedDate, cellDate);
+                const isToday = isSameDay(currentDate, cellDate);
+                const dayTasks = tasks.filter(task => isSameDay(toLocalDate(task.start_time), cellDate));
+                return (
+                  <div key={`date-${idx}`} className="aspect-square p-1">
+                    <button
+                      onClick={() => setSelectedDate(cellDate)}
+                      className={`w-full h-full rounded-lg flex items-center justify-center transition-colors relative text-sm ${
+                        isSel ? 'bg-cyan-600/30 text-white ring-1 ring-cyan-400' : isToday ? 'bg-cyan-500/10 text-white' : 'hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      {date}
+                      {dayTasks.length > 0 && (
+                        <span className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-cyan-400 rounded-full" />
+                      )}
+                    </button>
                   </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-2 text-center">
-                {monthDates.map((date, dateIndex) => {
-                  if (!date) {
-                    return <div key={`empty-${dateIndex}`} className="aspect-square" />;
-                  }
-
-                  const currentDateForCell = new Date(year, monthIndex, date);
-                  const isSelected = selectedDate && isSameDay(selectedDate, currentDateForCell);
-                  const isToday = isSameDay(currentDate, currentDateForCell);
-
-                  const dayTasks = tasks.filter(task => {
-                    const taskDate = toLocalDate(task.start_time);
-                    return isSameDay(taskDate, currentDateForCell);
-                  });
-
-                  return (
-                    <div key={`date-${dateIndex}`} className="aspect-square p-1">
-                      <button
-                        onClick={() => handleDayClick(date, monthIndex)}
-                        className={`w-full h-full rounded-lg flex items-center justify-center transition-colors relative text-sm ${
-                          isSelected
-                            ? 'bg-gray-700 text-white'
-                            : isToday
-                              ? 'bg-gray-800 text-white font-medium'
-                              : 'hover:bg-gray-700'
-                        }`}
-                      >
-                        {date}
-                        {dayTasks.length > 0 && (
-                          <span className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full" />
-                        )}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+                );
+              });
+            })()}
+          </div>
+        </div>
       </div>
 
       {isModalOpen && selectedDate && (

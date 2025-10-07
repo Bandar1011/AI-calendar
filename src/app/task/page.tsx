@@ -3,11 +3,12 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useUser, UserButton } from '@clerk/nextjs';
 import Calendar, { CalendarRef } from './Calendar';
+import Onboarding from '@/components/Onboarding';
 import AIChatPanel from '@/components/AIChatPanel';
 
 export default function TaskPage() {
   const calendarRef = useRef<CalendarRef>(null);
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
   const [chatWidth, setChatWidth] = useState(400);
   const [isDragging, setIsDragging] = useState(false);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -61,6 +62,8 @@ export default function TaskPage() {
 
       {/* Main Content */}
       <div className="flex h-[calc(100vh-64px)] relative">
+        {/* Onboarding overlay */}
+        <Onboarding userId={user?.id ?? null} />
         {/* Calendar Section */}
         <div className="flex-1 p-4 overflow-auto min-w-0">
           <Calendar ref={calendarRef} />
