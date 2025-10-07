@@ -122,32 +122,12 @@ export default function AIChatPanel({ calendarRef }: AIChatPanelProps) {
 
       if (isDirectEventRequest) {
         try {
-          const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-          if (!apiKey) throw new Error('Missing NEXT_PUBLIC_GEMINI_API_KEY');
-          const genAI = new GoogleGenerativeAI(apiKey);
-          const model = genAI.getGenerativeModel({ model: process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.0-flash' });
-          const nowIso = new Date().toISOString();
-          const prompt = `Extract exactly ONE concrete event from the user's request.
-Return strictly JSON (no markdown). Schema:
-{
-  "title": string,
-  "date": "YYYY-MM-DD",    // absolute calendar date required
-  "time": "HH:mm",         // start time 24h
-  "endTime": "HH:mm"       // optional, if user gave an end time or duration
-}
-Rules:
-- Use the explicit date/time mentioned by the user (e.g., "December 2nd 1-2pm").
-- If the request lacks a concrete date, return {}.
-- Do not invent multiple events.
-Current time: ${nowIso}
-User: ${message}`;
-          const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' },
+          const resp = await fetch('/api/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: message })
           });
-          const text = await result.response.text();
-          let one: any = {};
-          try { one = JSON.parse(text || '{}'); } catch {}
+          const one = await resp.json().catch(() => ({}));
           if (one?.date && one?.time && one?.title) {
             const when = new Date(`${one.date}T${one.time}`);
             await calendarRef.current.handleAddTask(one.title, when);

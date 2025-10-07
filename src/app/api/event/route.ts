@@ -1,6 +1,28 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getAuth } from "@clerk/nextjs/server";
-import { createServerSupabaseClient, createServiceSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
+import { z } from 'zod';
+
+// Naive in-memory rate limit (per instance)
+const ipUserToCount = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const rec = ipUserToCount.get(key);
+  if (!rec || now > rec.resetAt) {
+    ipUserToCount.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (rec.count >= limit) return false;
+  rec.count += 1;
+  return true;
+}
+
+const eventSchema = z.object({
+  title: z.string().min(1).max(120),
+  description: z.string().max(500).optional().default(''),
+  start_time: z.string().refine(v => !isNaN(new Date(v).getTime()), 'Invalid start_time'),
+  end_time: z.string().refine(v => !isNaN(new Date(v).getTime()), 'Invalid end_time'),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,18 +59,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    
+    // Rate limit per user+ip
+    const ip = request.headers.get('x-forwarded-for') || 'local';
+    const bucket = `${userId}:${ip}`;
+    if (!rateLimit(bucket, 60, 60_000)) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
+
+    const parsed = eventSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    }
+    const { title, description, start_time, end_time } = parsed.data;
+
+    const start = new Date(start_time);
+    const end = new Date(end_time);
+    if (!(end > start)) {
+      return NextResponse.json({ error: 'end_time must be after start_time' }, { status: 400 });
+    }
+
     const event = {
-      title: body.title,
-      description: body.description,
-      start_time: new Date(body.start_time).toISOString(),
-      end_time: new Date(body.end_time).toISOString(),
-      user_id: userId
+      title,
+      description,
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      user_id: userId,
     };
 
-    // Prefer service role to avoid RLS/write issues; falls back to anon if missing
-    const supabase = createServiceSupabaseClient();
+    // Expect RLS to allow insert when user_id = auth.uid()
+    const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('events')
       .insert([event])
@@ -74,6 +113,12 @@ export async function DELETE(request: NextRequest) {
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const ip = request.headers.get('x-forwarded-for') || 'local';
+    const bucket = `${userId}:${ip}:del`;
+    if (!rateLimit(bucket, 60, 60_000)) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
 
     const { id } = await request.json();

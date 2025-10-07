@@ -145,11 +145,14 @@ const Calendar = forwardRef<CalendarRef | null>((props, ref) => {
   return (
     <div className="bg-gradient-to-br from-[#0b0e1a] via-[#121735] to-[#1a1233] text-white">
       <div className="flex items-center justify-between mb-6">
-        <button onClick={handlePrevMonth} className="px-4 py-2 rounded-lg border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors">Prev</button>
+        <button onClick={handlePrevMonth} className="px-4 py-2 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">Prev</button>
         <h1 className="text-2xl font-bold tracking-wide">
           <span className="text-cyan-300">{months[viewMonth]}</span> {viewYear}
         </h1>
-        <button onClick={handleNextMonth} className="px-4 py-2 rounded-lg border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors">Next</button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setSelectedDate(selectedDate ?? new Date(viewYear, viewMonth, 1)); setIsModalOpen(true); }} className="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600/70 to-fuchsia-600/70 text-white hover:from-violet-500 hover:to-fuchsia-500 transition-colors">Add Task</button>
+          <button onClick={handleNextMonth} className="px-4 py-2 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">Next</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
